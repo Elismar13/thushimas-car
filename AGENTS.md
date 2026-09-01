@@ -52,8 +52,9 @@ When a doc conflicts with code, the doc should be updated too — never silently
 ```text
 src/       # firmware source (single evolving PlatformIO project)
 lib/       # firmware libraries
-include/   # firmware public headers
+include/   # firmware public headers (incl. gitignored config.h)
 test/      # unit tests
+tools/     # PC-side tooling (MQTT viewer, mock publisher)
 docs/      # project documentation (see §2)
 platformio.ini
 ```
@@ -68,10 +69,10 @@ Phases are **not** separate folders. Each phase milestone is a git tag
 PlatformIO is available at `~/.platformio/penv/bin/pio` (not on PATH by default):
 
 ```bash
-~/.platformio/penv/bin/pio run                 # compile firmware
+~/.platformio/penv/bin/pio run                 # compile firmware (esp32dev)
 ~/.platformio/penv/bin/pio run -t upload       # compile + flash via USB
 ~/.platformio/penv/bin/pio monitor             # serial monitor (115200)
-~/.platformio/penv/bin/pio test --without-uploading  # unit tests (needs test files first)
+~/.platformio/penv/bin/pio test -e native --without-uploading  # host unit tests
 ```
 
 * Always run `pio run` after changing firmware code — the task is not done until it compiles.

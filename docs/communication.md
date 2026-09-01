@@ -135,7 +135,49 @@ angles     → degrees
 
 ---
 
-## 6. Reliability
+## 6. Scan Dataset
+
+A complete 360 degree scan produced by a single half-sweep of the rotating
+sensor head (0 → 180 degrees). Because the two HC-SR04s face opposite
+directions, every half-sweep yields a full 360 degree dataset. Published to
+`car/scan` (QoS 0).
+
+Scan lifecycle: `START_SCAN` begins continuous scanning (each completed
+half-sweep is published as one scan message); `STOP_SCAN` halts it. The car is
+stopped at boot and never scans until commanded.
+
+```json
+{
+  "type": "scan",
+  "protocolVersion": "1.0",
+  "sensor": "ultrasonic",
+  "timestamp": 123456,
+  "points": [
+    { "bearing": 0, "distance": 123, "sensor": "ultrasonic_1" },
+    { "bearing": 180, "distance": 456, "sensor": "ultrasonic_2" }
+  ]
+}
+```
+
+Semantics:
+
+* `bearing` — absolute direction in degrees, robot frame, `0` = forward,
+  increasing counterclockwise, normalized to `[0, 360)`.
+* `distance` — millimeters. `0` = no echo / out of range.
+* `sensor` — which physical transducer produced the reading
+  (`ultrasonic_1` / `ultrasonic_2`). Sensor 1 faces the sweep direction;
+  sensor 2 faces opposite (see `docs/hardware.md`).
+* `points` — sorted by `bearing`.
+* Bearing mapping: sensor 1 bearing == head angle; sensor 2 bearing ==
+  head angle + 180 (mod 360). One 0 → 180 degree head sweep at step `S`
+  produces `2 * (180 / S + 1)` points.
+
+This schema is the durable interface for sensor visualization; the PC tools in
+`tools/` (and any future web/mobile UI) consume exactly this payload.
+
+---
+
+## 7. Reliability
 
 Safety must not depend on the PC.
 
@@ -154,7 +196,7 @@ STOP (throttle = 0)
 
 ---
 
-## 7. Versioning
+## 8. Versioning
 
 The protocol should include a version once it becomes stable.
 

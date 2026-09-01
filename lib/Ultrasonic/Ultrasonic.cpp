@@ -14,5 +14,5 @@ uint32_t Ultrasonic::measureCm() {
 }
 
 uint32_t Ultrasonic::measureMm() {
-    return sonar_.ping_cm();
+    return static_cast<uint32_t>(sonar_.ping_cm()) * 10;
 }

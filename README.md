@@ -95,8 +95,8 @@ Avoid implementing future functionality prematurely.
 | 1     | Throttle & steering control | ⬜      |
 | 2     | Remote control             | ⬜      |
 | 3     | Obstacle avoidance         | ⬜      |
-| 4     | Rotating sonar             | ⬜      |
-| 5     | Sensor visualization       | ⬜      |
+| 4     | Rotating sonar             | 🟡      |
+| 5     | Sensor visualization       | 🟡      |
 | 6     | Environment mapping        | ⬜      |
 | 7     | Localization               | ⬜      |
 | 8     | Autonomous exploration     | ⬜      |
@@ -107,11 +107,22 @@ Avoid implementing future functionality prematurely.
 
 ## Current Phase
 
-**Phase 0 — Project Foundation**
+**Phase 4/5 — Rotating sonar data transfer + visualization (in progress)**
 
-The immediate objective is not to build the complete car.
+The current objective is the sonar data path end-to-end, focusing on the
+communication layer:
 
-The immediate objective is to establish the architecture, requirements, hardware assumptions, and development roadmap.
+* ESP32 produces structured 360° scans (wiper sweep of the dual opposed
+  HC-SR04s) and publishes them to `car/scan` over MQTT.
+* `START_SCAN` / `STOP_SCAN` commands drive continuous scanning; the car is
+  stopped and silent at boot.
+* PC tooling in `tools/` (`sonar_viewer.py`, `mock_scan_publisher.py`) validates
+  the protocol. The scan schema in `docs/communication.md` is the durable
+  interface; the desktop viewer is only a test harness for the future
+  web/mobile UI.
+
+Wi-Fi credentials and broker address go in `include/config.h` (gitignored —
+copy from `include/config.example.h`).
 
 ---
 
@@ -165,6 +176,8 @@ A single evolving PlatformIO firmware:
 ```text
 src/      # firmware source
 lib/      # libraries
+include/  # firmware public headers (incl. gitignored config.h)
+tools/    # PC-side tooling (MQTT viewer, mock publisher)
 test/     # unit tests
 docs/     # project documentation
 ```

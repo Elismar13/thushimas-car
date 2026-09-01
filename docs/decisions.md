@@ -31,6 +31,13 @@ This file records committed decisions and open (TBD) items. Agents should build 
 | 20 | Wrapper policy | Thin in-house wrappers (`lib/ServoControl`, `lib/Ultrasonic`) keep a stable mm/degrees interface; external libraries do the real work | Everywhere |
 | 21 | Scan geometry | One head servo rotates a head carrying two HC-SR04s facing opposite (180° apart); 180° head sweep → 360° combined coverage | Phase 4 |
 | 22 | Ultrasonic driver | SUPERSEDED by #19 (back to `teckel12/NewPing`); `lib/Ultrasonic` wraps it with correct µs→cm→mm conversion | Phase 1+ |
+| 23 | MQTT client | `knolleary/PubSubClient` on the ESP32; JSON handled by `bblanchon/ArduinoJson` | Phase 4/5 |
+| 24 | Wi-Fi config | Credentials + broker in `include/config.h` (gitignored); `include/config.example.h` committed as template | Phase 2+ |
+| 25 | Scan payload | `car/scan` JSON: `{ type, protocolVersion, sensor, timestamp, points[ {bearing, distance, sensor} ] }` — schema in `docs/communication.md` §6 | Phase 5 |
+| 26 | Angle convention | `bearing` in degrees, `0` = forward, CCW positive, `[0, 360)`; `distance` in mm; `0` = no echo | Phase 4/5 |
+| 27 | Scan trigger | Command-driven + continuous: `START_SCAN`/`STOP_SCAN`; repeats periodically while active; stopped at boot | Phase 4/5 |
+| 28 | Scan motion | Wiper sweep 0 → 180 → 0; each half-sweep published as one complete 360° scan | Phase 4 |
+| 29 | PC GUI | Phase 5 test harness = PyQtGraph viewer in `tools/`; desktop is not the target platform (future: web/mobile); the protocol is the durable interface | Phase 5 |
 
 ---
 
@@ -47,9 +54,8 @@ This file records committed decisions and open (TBD) items. Agents should build 
 | 7 | Motor encoder | Rear drive motor with encoder, for Phase 7 odometry | Phase 7 |
 | 8 | Localization method | Encoder+steering vs IMU vs fusion; experimental | Phase 7 |
 | 9 | Obstacle threshold | Stop distance for avoidance/E-stop | Phase 3 |
-| 10 | Wi-Fi credentials | SSID/password config strategy (config header, secrets) | Phase 2 |
-| 11 | Simulation | README mentions `simulator/`; scope undecided | Any |
-| 12 | License | README says TBD | Any |
+| 10 | Simulation | README mentions `simulator/`; scope undecided | Any |
+| 11 | License | README says TBD | Any |
 
 ---
 
