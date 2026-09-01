@@ -95,7 +95,8 @@ bool MqttTransport::publishScan(const char* payload) {
     if (mqtt_.publish(scanTopic_, payload)) {
         return true;
     }
-    Serial.println("[net] scan publish FAILED");
+    Serial.printf("[net] scan publish FAILED (%u bytes; check MQTT_MAX_PACKET_SIZE)\n",
+                  static_cast<unsigned>(strlen(payload)));
     return false;
 }
 

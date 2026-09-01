@@ -45,11 +45,12 @@ void publishScan(const ScanData& scan) {
     if (length == 0) {
         return;
     }
-    mqtt.publishScan(buffer);
-    scanCount++;
-    Serial.printf("scan %lu published (%u points)\n",
-                  static_cast<unsigned long>(scan.timestampMs),
-                  static_cast<unsigned>(scan.points.size()));
+    if (mqtt.publishScan(buffer)) {
+        scanCount++;
+        Serial.printf("scan %lu published (%u points)\n",
+                      static_cast<unsigned long>(scan.timestampMs),
+                      static_cast<unsigned>(scan.points.size()));
+    }
 }
 
 void publishStatus() {
