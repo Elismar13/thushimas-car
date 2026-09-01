@@ -13,7 +13,9 @@ MqttTransport::MqttTransport(const char* ssid, const char* password,
       scanTopic_(scanTopic),
       statusTopic_(statusTopic),
       mqtt_(wifiClient_),
-      lastReconnectMs_(0) {}
+      lastReconnectMs_(0),
+      wifiConnected_(false),
+      mqttConnected_(false) {}
 
 void MqttTransport::begin() {
     mqtt_.setServer(brokerHost_, brokerPort_);
@@ -25,10 +27,22 @@ void MqttTransport::begin() {
 
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid_, password_);
+    Serial.printf("[net] connecting to Wi-Fi \"%s\"...\n", ssid_);
 }
 
 void MqttTransport::loop() {
-    if (WiFi.status() != WL_CONNECTED) {
+    bool wifiUp = WiFi.status() == WL_CONNECTED;
+    if (wifiUp != wifiConnected_) {
+        wifiConnected_ = wifiUp;
+        if (wifiUp) {
+            Serial.printf("[net] Wi-Fi connected (IP %s)\n",
+                          WiFi.localIP().toString().c_str());
+        } else {
+            Serial.println("[net] Wi-Fi lost, reconnecting...");
+        }
+    }
+
+    if (!wifiUp) {
         // Reconnect Wi-Fi at most every kReconnectIntervalMs; stay offline (and
         // thus stopped) in between.
         uint32_t now = millis();
@@ -57,17 +71,44 @@ void MqttTransport::connectBroker() {
         return;
     }
     lastReconnectMs_ = now;
+
+    if (!mqttConnected_) {
+        Serial.printf("[net] connecting to broker %s:%u...\n", brokerHost_, brokerPort_);
+    }
     if (mqtt_.connect(clientId_)) {
         mqtt_.subscribe(cmdTopic_);
+        mqttConnected_ = true;
+        Serial.printf("[net] MQTT connected, subscribed to %s\n", cmdTopic_);
+    } else {
+        if (mqttConnected_) {
+            mqttConnected_ = false;
+        }
+        Serial.printf("[net] MQTT connect failed (rc=%d), retrying\n", mqtt_.state());
     }
 }
 
 bool MqttTransport::publishScan(const char* payload) {
-    return mqtt_.connected() && mqtt_.publish(scanTopic_, payload);
+    if (!mqtt_.connected()) {
+        Serial.println("[net] scan publish skipped: not connected");
+        return false;
+    }
+    if (mqtt_.publish(scanTopic_, payload)) {
+        return true;
+    }
+    Serial.println("[net] scan publish FAILED");
+    return false;
 }
 
 bool MqttTransport::publishStatus(const char* payload) {
-    return mqtt_.connected() && mqtt_.publish(statusTopic_, payload);
+    if (!mqtt_.connected()) {
+        Serial.println("[net] status publish skipped: not connected");
+        return false;
+    }
+    if (mqtt_.publish(statusTopic_, payload)) {
+        return true;
+    }
+    Serial.println("[net] status publish FAILED");
+    return false;
 }
 
 void MqttTransport::setCommandCallback(CommandCallback callback) {

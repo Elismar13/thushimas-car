@@ -131,6 +131,7 @@ copy from `include/config.example.h`).
 * [`docs/architecture.md`](docs/architecture.md) — system architecture, robot state, kinematic model, data flow
 * [`docs/hardware.md`](docs/hardware.md) — bill of materials, pin map, power architecture
 * [`docs/communication.md`](docs/communication.md) — MQTT/JSON protocol, topics, safety behavior
+* [`docs/local-development.md`](docs/local-development.md) — local setup: MQTT broker, PC tools, firmware config, end-to-end checks
 * [`docs/roadmap.md`](docs/roadmap.md) — phase definitions and Definitions of Done
 * [`docs/decisions.md`](docs/decisions.md) — decided choices vs open (TBD) items
 

@@ -7,3 +7,4 @@ include/config.h
 
 __pycache__/
 *.pyc
+tools/venv

@@ -49,4 +49,6 @@ private:
     PubSubClient mqtt_;
     CommandCallback commandCb_;
     uint32_t lastReconnectMs_;
+    bool wifiConnected_;
+    bool mqttConnected_;
 };
