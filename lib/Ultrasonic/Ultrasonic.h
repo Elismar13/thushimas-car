@@ -6,11 +6,11 @@
 class Ultrasonic {
 public:
     static constexpr uint16_t kMaxDistanceCm = 400;
-    static constexpr uint32_t kInvalidDistanceMm = 0;
 
     Ultrasonic(uint8_t trigPin, uint8_t echoPin);
 
     void begin();
+    uint32_t measureCm();
     uint32_t measureMm();
 
 private:

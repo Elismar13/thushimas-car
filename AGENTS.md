@@ -11,7 +11,8 @@ An experimental **autonomous car** built incrementally. It is **not** a differen
 
 * One rear DC motor = throttle (forward/reverse) via an L298N.
 * One front servo steers both front wheels (bicycle/Ackermann model).
-* One second servo rotates a head carrying two HC-SR04 ultrasonic sensors.
+* One second servo rotates a head carrying the two HC-SR04 sensors, mounted facing opposite
+  ways so a 180° head sweep covers 360°.
 * ESP32 DevKit V1 (WROOM-32), PlatformIO + Arduino framework.
 * PC talks to the car over Wi-Fi + MQTT (JSON), broker runs on the PC.
 
@@ -85,9 +86,10 @@ PlatformIO is available at `~/.platformio/penv/bin/pio` (not on PATH by default)
 ### Firmware (C++, Arduino for ESP32)
 
 * Target the environment `[env:esp32dev]` in `platformio.ini`.
-* Prefer mature external libraries over hand-rolled drivers (see `docs/decisions.md`).
-  Keep thin wrappers in `lib/` with stable units — the rest of the code never includes
-  the library headers directly. Current deps: `teckel12/NewPing`, `madhephaestus/ESP32Servo`.
+* Prefer mature external libraries for complex peripherals; simple peripherals may use
+  thin hand-rolled drivers. Keep stable units (mm, degrees) in `lib/` wrappers — the rest
+  of the code never includes the library headers directly. External deps:
+  `teckel12/NewPing` (HC-SR04) and `madhephaestus/ESP32Servo` (servos).
 * Add new libraries via `lib_deps` in `platformio.ini`; never vendor library code into `lib/`.
 * Respect the pin map in `docs/hardware.md` (§3). Never assign a pin already in use.
 * HC-SR04 ECHO is 5 V; level-shift (resistor divider) — do not feed 5 V into a GPIO.

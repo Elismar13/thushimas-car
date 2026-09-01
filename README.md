@@ -131,7 +131,7 @@ The final car may support:
 
 * Manual driving
 * Autonomous obstacle avoidance
-* 180° environmental scanning
+* 360° environmental scanning (2 opposed 180° heads)
 * 2D occupancy mapping
 * Car localization
 * Autonomous exploration

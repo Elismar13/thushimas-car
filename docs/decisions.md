@@ -27,8 +27,10 @@ This file records committed decisions and open (TBD) items. Agents should build 
 | 16 | Repo structure | Single evolving PlatformIO firmware; phases as git tags + docs | Layout |
 | 17 | Reverse | Forward **and** reverse throttle | Phase 1, protocol |
 | 18 | Pin map | Proposed GPIO allocation in `docs/hardware.md` | Wiring |
-| 19 | Driver libraries | Prefer mature external libraries for hardware drivers: `teckel12/NewPing` (HC-SR04) and `madhephaestus/ESP32Servo` (servos), via `lib_deps` in `platformio.ini` | Phase 1+ |
+| 19 | Driver libraries | Mature external libraries via `lib_deps`: `teckel12/NewPing` (HC-SR04) and `madhephaestus/ESP32Servo` (servos) | Phase 1+ |
 | 20 | Wrapper policy | Thin in-house wrappers (`lib/ServoControl`, `lib/Ultrasonic`) keep a stable mm/degrees interface; external libraries do the real work | Everywhere |
+| 21 | Scan geometry | One head servo rotates a head carrying two HC-SR04s facing opposite (180° apart); 180° head sweep → 360° combined coverage | Phase 4 |
+| 22 | Ultrasonic driver | SUPERSEDED by #19 (back to `teckel12/NewPing`); `lib/Ultrasonic` wraps it with correct µs→cm→mm conversion | Phase 1+ |
 
 ---
 
@@ -40,8 +42,8 @@ This file records committed decisions and open (TBD) items. Agents should build 
 | 2 | Wheelbase L and δ_max | Must be measured from the actual chassis; affects kinematics, odometry, path feasibility | Phase 1, 7, 9 |
 | 3 | Motor specs | Voltage, RPM, stall current (affects gearing, current draw, PWM mapping) | Phase 1 |
 | 4 | Battery capacity | mAh of the 18650 cells | Phase 1 |
-| 5 | Sensor-head layout | Two HC-SR04s angled apart vs parallel on the rotating head | Phase 4 |
-| 6 | Scan geometry | 180° sweep with both sensors sampling, vs split coverage | Phase 4 |
+| 5 | Sensor-head layout | SUPERSEDED by Decided #21 (two sensors facing opposite on one head) | — |
+| 6 | Scan geometry | SUPERSEDED by Decided #21 (opposed sensors, 180° head sweep = 360°) | — |
 | 7 | Motor encoder | Rear drive motor with encoder, for Phase 7 odometry | Phase 7 |
 | 8 | Localization method | Encoder+steering vs IMU vs fusion; experimental | Phase 7 |
 | 9 | Obstacle threshold | Stop distance for avoidance/E-stop | Phase 3 |

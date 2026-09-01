@@ -21,7 +21,7 @@ The kinematic model is documented in `docs/architecture.md` (§ Kinematic Model)
 | Motor driver               | L298N (one channel used)                    | Motor control            | DECIDED |
 | Steering servo             | SG90 micro servo (front)                    | Cornering                | DECIDED |
 | Sensor-head servo          | SG90 micro servo                            | Rotates the sonar head   | DECIDED |
-| Ultrasonic sensors         | 2× HC-SR04 mounted on the rotating head     | Distance measurement     | DECIDED |
+| Ultrasonic sensors         | 2× HC-SR04 on one head, facing opposite     | Distance measurement     | DECIDED |
 | Chassis                    | Car-style, steerable front wheels           | Mechanical platform      | TBD     |
 | Wheels                     | 2 driven rear, 2 steered front              | Movement                 | TBD     |
 | Battery                    | 2× 18650 (7.4 V nominal)                    | Power                    | DECIDED |
@@ -43,7 +43,7 @@ Proposed allocation for the ESP32 DevKit V1 (WROOM-32). Adjust during wiring if 
 | L298N IN1            | 14    | Direction A                                                   |
 | L298N IN2            | 27    | Direction B                                                   |
 | Steering servo       | 16    | PWM 50 Hz, ~1–2 ms pulse                                      |
-| Sensor-head servo    | 17    | PWM 50 Hz                                                    |
+| Sensor-head servo    | 17    | PWM 50 Hz, rotates the dual-sensor head                       |
 | Ultrasonic 1 TRIG    | 25    | HC-SR04                                                      |
 | Ultrasonic 1 ECHO    | 26    | **5 V → 3.3 V level shifting required** (resistor divider)   |
 | Ultrasonic 2 TRIG    | 32    | HC-SR04                                                      |
@@ -119,34 +119,32 @@ Limitations:
 * Limited angular resolution
 * Wide beam
 * Surface-dependent reflections
-* Sensor interference (two sensors on the same head)
+* Sensor interference (both sensors on the same head)
 
-The two HC-SR04s are mounted on a shared rotating head. The head arrangement
-(angled apart vs parallel) and the scan geometry are **TBD** — see `docs/decisions.md`.
+The two HC-SR04s are mounted on one rotating head, facing **opposite directions**
+(180° apart). One servo sweeps the head 180°; each sensor covers its own 180° arc,
+giving combined 360° coverage (see `docs/decisions.md`, Decided #21).
 
 ---
 
 ## 7. Rotating Sensor Head
 
-A servo rotates a head carrying two ultrasonic sensors.
+One servo rotates a head carrying two ultrasonic sensors facing opposite ways.
 
 ```text
-      [US1]  [US2]
-         \    /
-          [HEAD]
-            │
-          [SERVO]
-            │
-            ↕ rotates
-          ┌─────┐
-          │     │
-          │ CAR │
-          └─────┘
+      [US1]   (front-facing)
+        │
+    [HEAD / SERVO]  sweeps 0–180° (GPIO17)
+        │
+    ┌──────────────┐
+    │     CAR      │
+    └──────────────┘
+        │
+      [US2]   (rear-facing, opposite to US1)
 ```
 
+* US1 and US2 face 180° apart, so as the head sweeps 0–180° the pair covers 360°.
 * Both sensors fire sequentially (never simultaneously) to avoid crosstalk.
-* Initial scan range: ~180°.
-* Exact head layout and scan geometry: **TBD** (see `docs/decisions.md`).
 
 ---
 

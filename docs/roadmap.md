@@ -96,18 +96,15 @@ Transform the ultrasonic sensors into a directional scanning system.
 
 ### Deliverables
 
-* Sensor-head servo integration
+* Single head servo with two opposed HC-SR04s (180° apart → 360° combined)
 * Angular positioning
-* Dual-sensor firing sequence (no crosstalk)
-* 0–180° scan
+* Sensor synchronization (no crosstalk)
 * Angle/distance dataset
 * Scan repeatability
 
-> Sensor-head layout (angled vs parallel) and exact scan geometry are TBD — see `docs/decisions.md`.
-
 ### Definition of Done
 
-The car can perform a repeatable 180° scan and produce structured measurement data.
+The car can perform repeatable 360° scans and produce structured measurement data.
 
 ---
 

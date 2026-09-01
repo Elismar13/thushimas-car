@@ -9,6 +9,10 @@ void Ultrasonic::begin() {
     digitalWrite(trigPin_, LOW);
 }
 
+uint32_t Ultrasonic::measureCm() {
+    return sonar_.ping_cm();
+}
+
 uint32_t Ultrasonic::measureMm() {
-    return sonar_.ping_median(5) * 10UL;
+    return sonar_.ping_cm();
 }
