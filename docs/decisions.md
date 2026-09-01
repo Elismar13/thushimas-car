@@ -27,6 +27,8 @@ This file records committed decisions and open (TBD) items. Agents should build 
 | 16 | Repo structure | Single evolving PlatformIO firmware; phases as git tags + docs | Layout |
 | 17 | Reverse | Forward **and** reverse throttle | Phase 1, protocol |
 | 18 | Pin map | Proposed GPIO allocation in `docs/hardware.md` | Wiring |
+| 19 | Driver libraries | Prefer mature external libraries for hardware drivers: `teckel12/NewPing` (HC-SR04) and `madhephaestus/ESP32Servo` (servos), via `lib_deps` in `platformio.ini` | Phase 1+ |
+| 20 | Wrapper policy | Thin in-house wrappers (`lib/ServoControl`, `lib/Ultrasonic`) keep a stable mm/degrees interface; external libraries do the real work | Everywhere |
 
 ---
 
