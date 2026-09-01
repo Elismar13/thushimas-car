@@ -16,6 +16,13 @@ import numpy as np
 import paho.mqtt.client as mqtt
 import pyqtgraph as pg
 
+try:  # paho-mqtt >= 2.0
+    from paho.mqtt.client import CallbackAPIVersion
+
+    _API_VERSION = CallbackAPIVersion.VERSION2
+except ImportError:  # paho-mqtt < 2.0
+    _API_VERSION = None
+
 
 class ScanViewer:
     def __init__(self, max_distance_mm=4000):
@@ -76,7 +83,7 @@ class ScanViewer:
 
     def start(self, broker, port, topic):
         self.topic = topic
-        self.client = mqtt.Client()
+        self.client = mqtt.Client(callback_api_version=_API_VERSION)
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
         self.client.connect(broker, port)
@@ -84,11 +91,11 @@ class ScanViewer:
         print("listening on %s" % topic)
         sys.exit(self.app.exec())
 
-    def _on_connect(self, client, userdata, flags, rc):
-        if rc == 0:
+    def _on_connect(self, client, userdata, flags, reason_code, properties=None):
+        if reason_code == 0:
             client.subscribe(self.topic)
         else:
-            print("MQTT connection failed: rc=%d" % rc)
+            print("MQTT connection failed: rc=%s" % reason_code)
 
     def _on_message(self, client, userdata, msg):
         self.on_scan(msg.payload.decode("utf-8"))

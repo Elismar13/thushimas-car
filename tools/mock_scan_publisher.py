@@ -15,6 +15,13 @@ import time
 
 import paho.mqtt.client as mqtt
 
+try:  # paho-mqtt >= 2.0
+    from paho.mqtt.client import CallbackAPIVersion
+
+    _API_VERSION = CallbackAPIVersion.VERSION2
+except ImportError:  # paho-mqtt < 2.0
+    _API_VERSION = None
+
 ROOM_HALF = 1500.0  # mm from center to each wall
 MAX_SENSOR_MM = 4000
 DROPOUT_PROB = 0.05  # probability a reading is "no echo" (distance 0)
@@ -70,7 +77,7 @@ def main():
     parser.add_argument("--interval", type=float, default=4.0, help="seconds between scans")
     args = parser.parse_args()
 
-    client = mqtt.Client()
+    client = mqtt.Client(callback_api_version=_API_VERSION)
     client.connect(args.broker, args.port)
     client.loop_start()
     print("publishing fake scans to %s:%d%s every %.1fs" %
