@@ -5,6 +5,18 @@ Subscribes to car/scan and renders each scan as a polar (radar) plot and a
 Cartesian point plot. This is a throwaway test frontend: the durable artifact is
 the scan protocol itself, which is designed to be reused by the future web or
 mobile UI.
+
+The car stays stopped until commanded, so this viewer can also drive it:
+
+  S  -> publish START_SCAN to car/cmd
+  X  -> publish STOP_SCAN
+  P  -> publish PING
+  --auto-start sends START_SCAN as soon as it connects
+
+Progress is printed to the console so the script is never silently idle:
+  * MQTT connect result
+  * every command sent
+  * a one-line summary for every scan rendered
 """
 
 import argparse
@@ -15,6 +27,7 @@ import sys
 import numpy as np
 import paho.mqtt.client as mqtt
 import pyqtgraph as pg
+from pyqtgraph.Qt import QtCore, QtGui
 
 try:  # paho-mqtt >= 2.0
     from paho.mqtt.client import CallbackAPIVersion
@@ -24,9 +37,17 @@ except ImportError:  # paho-mqtt < 2.0
     _API_VERSION = None
 
 
+class _ScanBridge(QtCore.QObject):
+    # Delivers scan payloads to the Qt main thread, so the MQTT network thread
+    # never touches widgets directly.
+    scan_received = QtCore.Signal(str)
+
+
 class ScanViewer:
-    def __init__(self, max_distance_mm=4000):
+    def __init__(self, max_distance_mm=4000, cmd_topic="car/cmd", auto_start=False):
         self.app = pg.mkQApp()
+        self.cmd_topic = cmd_topic
+        self.auto_start = auto_start
         self.win = pg.GraphicsLayoutWidget(show=True)
         self.win.setWindowTitle("Sonar scan - waiting for data...")
 
@@ -48,6 +69,24 @@ class ScanViewer:
         self.polar.addItem(self.polar_scatter)
         self.cart.addItem(self.cart_scatter)
 
+        self._bridge = _ScanBridge()
+        self._bridge.scan_received.connect(self.on_scan)
+
+        self._add_shortcuts()
+
+    def _add_shortcuts(self):
+        QtGui.QShortcut(QtGui.QKeySequence("s"), self.win,
+                        activated=lambda: self.send_command("START_SCAN"))
+        QtGui.QShortcut(QtGui.QKeySequence("x"), self.win,
+                        activated=lambda: self.send_command("STOP_SCAN"))
+        QtGui.QShortcut(QtGui.QKeySequence("p"), self.win,
+                        activated=lambda: self.send_command("PING"))
+
+    def send_command(self, command):
+        payload = json.dumps({"type": "command", "command": command})
+        self.client.publish(self.cmd_topic, payload, qos=1)
+        print("[viewer] sent %s -> %s" % (command, self.cmd_topic))
+
     def _add_polar_grid(self, plot, max_distance_mm):
         grid_pen = pg.mkPen((150, 150, 150, 80))
         for radius in range(500, max_distance_mm + 1, 500):
@@ -62,6 +101,7 @@ class ScanViewer:
         try:
             scan = json.loads(payload)
         except json.JSONDecodeError:
+            print("[viewer] bad scan payload: %.120s..." % payload)
             return
 
         points = scan.get("points", [])
@@ -73,6 +113,8 @@ class ScanViewer:
             y = distances * np.sin(angles)
             self.polar_scatter.setData(x, y)
             self.cart_scatter.setData(x, y)
+            self.polar.autoRange()
+            self.cart.autoRange()
         else:
             self.polar_scatter.setData([], [])
             self.cart_scatter.setData([], [])
@@ -80,6 +122,8 @@ class ScanViewer:
         self.win.setWindowTitle(
             "Sonar scan - %d points, proto %s, t=%d"
             % (len(points), scan.get("protocolVersion", "?"), scan.get("timestamp", 0)))
+        print("[viewer] rendered scan: %d points, proto %s, t=%d"
+              % (len(points), scan.get("protocolVersion", "?"), scan.get("timestamp", 0)))
 
     def start(self, broker, port, topic):
         self.topic = topic
@@ -88,17 +132,22 @@ class ScanViewer:
         self.client.on_message = self._on_message
         self.client.connect(broker, port)
         self.client.loop_start()
-        print("listening on %s" % topic)
+        print("[viewer] listening on %s (broker %s:%d)" % (topic, broker, port))
+        print("[viewer] keys: S=start scan, X=stop scan, P=ping")
         sys.exit(self.app.exec())
 
     def _on_connect(self, client, userdata, flags, reason_code, properties=None):
         if reason_code == 0:
             client.subscribe(self.topic)
+            print("[viewer] connected, subscribed to %s" % self.topic)
+            if self.auto_start:
+                self.send_command("START_SCAN")
         else:
-            print("MQTT connection failed: rc=%s" % reason_code)
+            print("[viewer] MQTT connection failed: rc=%s" % reason_code)
 
     def _on_message(self, client, userdata, msg):
-        self.on_scan(msg.payload.decode("utf-8"))
+        # Runs on the paho network thread: forward to the Qt thread via signal.
+        self._bridge.scan_received.emit(msg.payload.decode("utf-8"))
 
 
 def main():
@@ -106,10 +155,14 @@ def main():
     parser.add_argument("--broker", default="localhost", help="MQTT broker host")
     parser.add_argument("--port", type=int, default=1883, help="MQTT broker port")
     parser.add_argument("--topic", default="car/scan", help="MQTT topic to subscribe to")
+    parser.add_argument("--cmd-topic", default="car/cmd", help="MQTT topic for commands")
+    parser.add_argument("--auto-start", action="store_true",
+                        help="send START_SCAN as soon as connected")
     parser.add_argument("--max-distance", type=int, default=4000, help="plot range in mm")
     args = parser.parse_args()
 
-    ScanViewer(max_distance_mm=args.max_distance).start(args.broker, args.port, args.topic)
+    ScanViewer(max_distance_mm=args.max_distance, cmd_topic=args.cmd_topic,
+               auto_start=args.auto_start).start(args.broker, args.port, args.topic)
 
 
 if __name__ == "__main__":
