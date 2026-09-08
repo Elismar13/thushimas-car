@@ -26,6 +26,9 @@ public:
 
     bool connected();
 
+    bool wifiConnected();
+    bool mqttConnected();
+
     bool publishScan(const char* payload);    // -> car/scan
     bool publishStatus(const char* payload);  // -> car/status
 

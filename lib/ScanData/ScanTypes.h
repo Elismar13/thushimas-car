@@ -22,3 +22,8 @@ int bearingFor(int headAngleDegrees, uint8_t sensorIndex);
 
 // Sort a scan's points by bearing (ascending, [0, 360)).
 void sortByBearing(ScanData& scan);
+
+// Nearest valid (distance > 0) echo in a scan. Returns its distance in mm, or
+// 0 if the scan has no valid reading. *bearingOut holds the bearing of that
+// echo and is only meaningful when the return value is non-zero.
+uint16_t nearestObstacle(const ScanData& scan, int* bearingOut);

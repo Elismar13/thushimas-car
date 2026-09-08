@@ -26,6 +26,7 @@ The kinematic model is documented in `docs/architecture.md` (§ Kinematic Model)
 | Wheels                     | 2 driven rear, 2 steered front              | Movement                 | TBD     |
 | Battery                    | 2× 18650 (7.4 V nominal)                    | Power                    | DECIDED |
 | Voltage regulation         | Motor rail + logic rail (separate 5 V buck) | Power                    | DECIDED |
+| Status display              | 16×2 HD44780 LCD w/ PCF8574 I2C backpack | On-car status screen | DECIDED |
 | Emergency stop             | Physical push button (wired to ESP32 GPIO)  | Safety                   | DECIDED |
 | Motor encoder              | On the rear drive motor                     | Odometry (Phase 7)       | TBD     |
 
@@ -53,6 +54,7 @@ Proposed allocation for the ESP32 DevKit V1 (WROOM-32). Adjust during wiring if 
 | Encoder B (future)   | 35    | Input-only, interrupt-capable, for Phase 7                    |
 | I2C SDA (future)     | 21    | Reserved for IMU or similar                                   |
 | I2C SCL (future)     | 22    | Reserved for IMU or similar                                   |
+| Status display       | 21/22 | HD44780 via PCF8574 I2C backpack (SDA=21, SCL=22), @ 0x27    |
 | UART0                | 1/3   | Built-in USB serial for debug                                 |
 
 Constraints respected:
@@ -64,7 +66,34 @@ Constraints respected:
 
 ---
 
-## 4. Power Architecture
+## 4. On-car Status Display
+
+A 16×2 HD44780 character LCD (common "I2C LCM" module with a PCF8574 backpack)
+shows on-car status that does not depend on the PC. It is **status-only**: it
+reads state and never issues movement or scan commands, so safety behavior is
+unaffected.
+
+* Wires: **SDA = GPIO21**, **SCL = GPIO22**, VCC from the 5 V logic rail, GND.
+* Default backpack address `0x27` (configurable in `src/main.cpp`).
+* For long I2C runs, add ~4.7 kΩ pull-ups on SDA/SCL to 3.3 V.
+
+The abstraction is display-agnostic: `lib/StatusDisplay` renders text against a
+generic `TextDisplay` interface (`lib/TextDisplay`). The concrete driver
+`lib/I2CLcdDisplay` wraps the `LiquidCrystal_I2C` library. Migrating to a
+20×4 LCD or an OLED later means adding another `TextDisplay` implementation and
+changing one instantiation, not the rendering logic.
+
+Auto-rotates three status pages every ~3 s:
+
+| Page | Row 1 | Row 2 |
+| ---- | ----- | ----- |
+| Status | `IDLE` / `SCAN ON` | `WIFI:ok MQTT:ok` |
+| Scan | `scan #1234` | `pts: 26` |
+| Nearest | `near 1234mm` | `@ 045deg` |
+
+---
+
+## 5. Power Architecture
 
 Two independent rails:
 
@@ -86,7 +115,7 @@ Two independent rails:
 
 ---
 
-## 5. Potential Future Hardware
+## 6. Potential Future Hardware
 
 Additional hardware may be introduced as required. Candidates include:
 
@@ -103,7 +132,7 @@ Hardware should only be added when a project phase demonstrates a requirement fo
 
 ---
 
-## 6. Sensor Strategy
+## 7. Sensor Strategy
 
 ### Ultrasonic
 
@@ -127,7 +156,7 @@ giving combined 360° coverage (see `docs/decisions.md`, Decided #21).
 
 ---
 
-## 7. Rotating Sensor Head
+## 8. Rotating Sensor Head
 
 One servo rotates a head carrying two ultrasonic sensors facing opposite ways.
 
@@ -148,7 +177,7 @@ One servo rotates a head carrying two ultrasonic sensors facing opposite ways.
 
 ---
 
-## 8. Sensor Synchronization
+## 9. Sensor Synchronization
 
 Multiple ultrasonic sensors must not transmit simultaneously.
 
@@ -168,7 +197,7 @@ Measurement
 
 ---
 
-## 9. Localization Hardware
+## 10. Localization Hardware
 
 No final localization hardware decision has been made.
 

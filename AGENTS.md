@@ -30,6 +30,7 @@ steering angle (degrees). Kinematics: `R = L / tan(δ)`.
 | `docs/communication.md` | MQTT topics, JSON command/telemetry schemas, safety behavior |
 | `docs/roadmap.md` | Phase definitions and Definitions of Done (DoD) |
 | `docs/decisions.md` | `DECIDED` choices vs open `TBD` items + change policy |
+| `docs/developer/index.md` | Developer reference: modules, data flows, state machines, integrations, build & test |
 
 **Golden rule:** treat `docs/decisions.md` as the source of truth for what is decided.
 When a doc conflicts with code, the doc should be updated too — never silently diverge.

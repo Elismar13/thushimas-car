@@ -19,6 +19,24 @@ void sortByBearing(ScanData& scan) {
               [](const ScanPoint& a, const ScanPoint& b) { return a.bearing < b.bearing; });
 }
 
+uint16_t nearestObstacle(const ScanData& scan, int* bearingOut) {
+    uint16_t nearest = 0;
+    int foundBearing = 0;
+    for (const ScanPoint& point : scan.points) {
+        if (point.distanceMm == 0) {
+            continue;  // 0 = no echo / out of range
+        }
+        if (nearest == 0 || point.distanceMm < nearest) {
+            nearest = point.distanceMm;
+            foundBearing = point.bearing;
+        }
+    }
+    if (bearingOut != nullptr) {
+        *bearingOut = foundBearing;
+    }
+    return nearest;
+}
+
 void ScanBuilder::reset() {
     data_ = ScanData();
 }

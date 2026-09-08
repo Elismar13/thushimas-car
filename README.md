@@ -120,6 +120,9 @@ communication layer:
   the protocol. The scan schema in `docs/communication.md` is the durable
   interface; the desktop viewer is only a test harness for the future
   web/mobile UI.
+* An on-car 16×2 I2C LCD (SDA=21/SCL=22) shows PC-independent status: Wi-Fi/MQTT
+  link, scan count, nearest obstacle. Rendered through a display-agnostic
+  interface so it can later be swapped for an OLED or larger LCD.
 
 Wi-Fi credentials and broker address go in `include/config.h` (gitignored —
 copy from `include/config.example.h`).
@@ -134,6 +137,7 @@ copy from `include/config.example.h`).
 * [`docs/local-development.md`](docs/local-development.md) — local setup: MQTT broker, PC tools, firmware config, end-to-end checks
 * [`docs/roadmap.md`](docs/roadmap.md) — phase definitions and Definitions of Done
 * [`docs/decisions.md`](docs/decisions.md) — decided choices vs open (TBD) items
+* [`docs/developer/`](docs/developer/index.md) — developer reference: modules, data flows, state machines, integrations, build & test
 
 ---
 

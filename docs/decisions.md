@@ -38,6 +38,8 @@ This file records committed decisions and open (TBD) items. Agents should build 
 | 27 | Scan trigger | Command-driven + continuous: `START_SCAN`/`STOP_SCAN`; repeats periodically while active; stopped at boot | Phase 4/5 |
 | 28 | Scan motion | Wiper sweep 0 → 180 → 0; each half-sweep published as one complete 360° scan | Phase 4 |
 | 29 | PC GUI | Phase 5 test harness = PyQtGraph viewer in `tools/`; desktop is not the target platform (future: web/mobile); the protocol is the durable interface | Phase 5 |
+| 30 | On-car display | 16×2 HD44780 + PCF8574 I2C (SDA=21, SCL=22), status-only, auto-rotating pages | Phase 5 |
+| 31 | Display abstraction | Render via generic `TextDisplay` interface; `StatusDisplay` is display-agnostic so a future OLED/20×4 is a drop-in driver | Phase 5 |
 
 ---
 

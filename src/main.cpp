@@ -2,8 +2,10 @@
 #include <ArduinoJson.h>
 
 #include "config.h"
+#include "I2CLcdDisplay.h"
 #include "MqttTransport.h"
 #include "SonarScan.h"
+#include "StatusDisplay.h"
 
 static constexpr uint8_t kHeadServoPin = 17;
 
@@ -15,6 +17,11 @@ static constexpr uint8_t kEcho2Pin = 33;
 static constexpr int kScanStepDegrees = 15;
 static constexpr uint32_t kSettleMs = 300;
 
+// On-car status display (16x2 HD44780 via PCF8574 I2C backpack).
+static constexpr uint8_t kLcdAddress = 0x27;
+static constexpr int kLcdCols = 16;
+static constexpr int kLcdRows = 2;
+
 static constexpr const char* kCmdTopic = "car/cmd";
 static constexpr const char* kScanTopic = "car/scan";
 static constexpr const char* kStatusTopic = "car/status";
@@ -22,8 +29,13 @@ static constexpr const char* kStatusTopic = "car/status";
 SonarScan scanner(kHeadServoPin, kTrig1Pin, kEcho1Pin, kTrig2Pin, kEcho2Pin);
 MqttTransport mqtt(WIFI_SSID, WIFI_PASSWORD, MQTT_BROKER_HOST, MQTT_BROKER_PORT,
                    MQTT_CLIENT_ID, kCmdTopic, kScanTopic, kStatusTopic);
+I2CLcdDisplay lcd(kLcdAddress, kLcdCols, kLcdRows);
+StatusDisplay display(lcd);
 
 static uint32_t scanCount = 0;
+static int lastPointCount = 0;
+static uint16_t lastNearestMm = 0;
+static int lastNearestBearing = 0;
 
 void publishScan(const ScanData& scan) {
     DynamicJsonDocument doc(2048);
@@ -47,6 +59,8 @@ void publishScan(const ScanData& scan) {
     }
     if (mqtt.publishScan(buffer)) {
         scanCount++;
+        lastPointCount = static_cast<int>(scan.points.size());
+        lastNearestMm = nearestObstacle(scan, &lastNearestBearing);
         Serial.printf("scan %lu published (%u points)\n",
                       static_cast<unsigned long>(scan.timestampMs),
                       static_cast<unsigned>(scan.points.size()));
@@ -94,6 +108,9 @@ void setup() {
     scanner.setStepDegrees(kScanStepDegrees);
     scanner.setSettleMs(kSettleMs);
 
+    lcd.begin();
+    display.begin();
+
     mqtt.setCommandCallback(handleCommand);
     mqtt.begin();
 
@@ -112,4 +129,15 @@ void loop() {
         // Never scan (or publish) without a live link; stay idle while offline.
         scanner.stop();
     }
+
+    StatusDisplay::State st;
+    st.wifiConnected = mqtt.wifiConnected();
+    st.mqttConnected = mqtt.connected();
+    st.scanning = scanner.scanning();
+    st.scanCount = scanCount;
+    st.pointCount = lastPointCount;
+    st.hasNearest = lastNearestMm > 0;
+    st.nearestMm = lastNearestMm;
+    st.nearestBearing = lastNearestBearing;
+    display.tick(millis(), st);
 }

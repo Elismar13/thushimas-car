@@ -65,6 +65,14 @@ bool MqttTransport::connected() {
     return WiFi.status() == WL_CONNECTED && mqtt_.connected();
 }
 
+bool MqttTransport::wifiConnected() {
+    return WiFi.status() == WL_CONNECTED;
+}
+
+bool MqttTransport::mqttConnected() {
+    return mqtt_.connected();
+}
+
 void MqttTransport::connectBroker() {
     uint32_t now = millis();
     if (now - lastReconnectMs_ < kReconnectIntervalMs) {
