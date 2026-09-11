@@ -41,16 +41,26 @@ graph LR
 
 ### `lib/ServoControl` — SG90 servo
 
-Thin wrapper over `ESP32Servo`. 50 Hz PWM, angle in degrees.
+Thin wrapper over `ESP32Servo`. 50 Hz PWM, angle in degrees. Each instance
+carries its own angular travel; `setAngle()` clamps to it.
 
 | Public API | Notes |
 | ---------- | ----- |
-| `ServoControl(uint8_t pin)` | constructor |
-| `begin()` | attaches the servo |
-| `setAngle(int angleDegrees)` | clamped to `[0, 180]` by the servo lib |
+| `ServoControl(uint8_t pin, int minAngle = 0, int maxAngle = 180)` | constructor; range defaults to `[0, 180]` |
+| `begin()` | attaches the servo, parks at 90 |
+| `setAngle(int angleDegrees)` | clamped to the configured `[min, max]` |
 | `angle()` | last commanded angle |
+| `minAngle()` / `maxAngle()` | configured travel |
 
-Default angle at construction: `90` (center).
+Two instances live in the firmware (see `src/main.cpp`):
+
+| Instance | Pin | Range | Default | Used for |
+| -------- | --- | ----- | ------- | -------- |
+| `steerServo` | 16 | `[40, 140]` | 90 (straight) | steering (STEER command) |
+| (inside `SonarScan`) `head_` | 17 | `[0, 180]` | 90 | rotating sensor head |
+
+The steering travel `[40, 140]` is a physical limit of the steering linkage
+(`docs/decisions.md` #32).
 
 ### `lib/Ultrasonic` — HC-SR04
 

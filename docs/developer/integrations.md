@@ -17,8 +17,8 @@ Broker on the PC (Mosquitto), Wi-Fi + MQTT. Schema in `docs/communication.md`.
 | `car/status` | ESP32 → PC | 0 | `main.cpp publishStatus()` (after commands) | — (no PC consumer yet) | Implemented, unused |
 | `car/telemetry` | ESP32 → PC | 0 | — | — | Documented (`communication.md` §4), **not implemented** |
 
-Command set in firmware today: `START_SCAN`, `STOP_SCAN`, `PING`.
-`THROTTLE`, `STEER`, `STOP`, `ESTOP`, `RESET_ESTOP`, `SET_SPEED_LIMIT` are in
+Command set in firmware today: `START_SCAN`, `STOP_SCAN`, `STEER {angle}`,
+`PING`. `THROTTLE`, `STOP`, `ESTOP`, `RESET_ESTOP`, `SET_SPEED_LIMIT` are in
 the protocol but dispatch is Phase 2.
 
 **Constants:** broker host/port/clientId → `include/config.h`; topics →
@@ -35,6 +35,7 @@ drops publishes — this was a real bug, see `git log a916730`).
 | Function | GPIO | Code constant | Accuracy |
 | -------- | ---- | ------------- | -------- |
 | Sensor-head servo | 17 | `kHeadServoPin` | matches `hardware.md` §3 |
+| Steering servo | 16 | `kSteerServoPin` (range `[40, 140]`) | matches `hardware.md` §3 |
 | Ultrasonic 1 TRIG | 25 | `kTrig1Pin` | matches |
 | Ultrasonic 1 ECHO | 26 | `kEcho1Pin` | matches (5 V → level-shift!) |
 | Ultrasonic 2 TRIG | 32 | `kTrig2Pin` | matches |
@@ -42,7 +43,6 @@ drops publishes — this was a real bug, see `git log a916730`).
 | I2C SDA | 21 | ESP32 default (LiquidCrystal_I2C uses `Wire`) | matches (`hardware.md` §4) |
 | I2C SCL | 22 | ESP32 default | matches |
 | E-stop button | 4 | — (Phase 1) | matches |
-| Steering servo | 16 | — (Phase 1) | matches |
 | L298N ENA/IN1/IN2 | 13/14/27 | — (Phase 1) | matches |
 
 > Never assign a pin already in use; consult `docs/hardware.md` §3 constraints

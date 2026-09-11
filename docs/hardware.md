@@ -43,7 +43,7 @@ Proposed allocation for the ESP32 DevKit V1 (WROOM-32). Adjust during wiring if 
 | L298N ENA (PWM)      | 13    | PWM throttle. Do not enable ENA before IN1/IN2 are set.       |
 | L298N IN1            | 14    | Direction A                                                   |
 | L298N IN2            | 27    | Direction B                                                   |
-| Steering servo       | 16    | PWM 50 Hz, ~1–2 ms pulse                                      |
+| Steering servo       | 16    | PWM 50 Hz, ~1–2 ms pulse. Travel limited to [40°, 140°] by the steering linkage; 90° = wheels straight.
 | Sensor-head servo    | 17    | PWM 50 Hz, rotates the dual-sensor head                       |
 | Ultrasonic 1 TRIG    | 25    | HC-SR04                                                      |
 | Ultrasonic 1 ECHO    | 26    | **5 V → 3.3 V level shifting required** (resistor divider)   |

@@ -92,6 +92,7 @@ Green = pure, hardware-free logic (also compiled by the native host tests).
 | Change scan step/settle timing | `src/main.cpp` constants `kScanStepDegrees`, `kSettleMs` |
 | Add a scan field to `car/scan` | `src/main.cpp` `publishScan()` + `docs/communication.md` §6 |
 | Add a new command | `src/main.cpp` `handleCommand()`; extend `communication.md` command list |
+| Trim/range a servo (e.g. steering travel) | `src/main.cpp` constants (e.g. `kSteerMinAngle`/`kSteerMaxAngle`) + `ServoControl` ctor defaults |
 | Change the MQTT reconnect behavior | `lib/MqttTransport/MqttTransport.cpp` `loop()` / `connectBroker()` |
 | Add a display page | `lib/StatusDisplay/StatusDisplay.cpp` `renderPage()` + `pageCount()` |
 | Support a different display (OLED/20x4) | Implement `TextDisplay`, change the instantiation in `main.cpp` |

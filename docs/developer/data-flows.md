@@ -75,7 +75,33 @@ roughly every 3.6 s.
 
 ---
 
-## 3. STOP_SCAN
+## 3. STEER command
+
+Moves the front steering servo (pin 16, travel `[40°, 140°]`). The command
+angle is **relative to straight**: `0` = centered (servo 90°), `+50` =
+full-right hard stop (140°), `-50` = full-left hard stop (40°). Out-of-range
+angles are clamped by `ServoControl::setAngle()`.
+
+```mermaid
+sequenceDiagram
+    participant V as sonar_viewer.py (or mosquitto_pub)
+    participant B as Broker
+    participant M as MqttTransport
+    participant C as main.cpp handleCommand()
+    participant S as steerServo
+    participant P as main.cpp publishStatus()
+
+    V->>B: PUB car/cmd {"command":"STEER","angle":30} (QoS 1)
+    B->>M: callback
+    M->>C: handleCommand(...)
+    C->>S: setAngle(90 + 30)  -> 120° (within [40,140])
+    S->>S: clamp to [40,140] if needed
+    C-->>B: publishStatus() -> car/status ({"steeringAngle":30})
+```
+
+---
+
+## 4. STOP_SCAN
 
 ```mermaid
 sequenceDiagram
@@ -95,7 +121,7 @@ sequenceDiagram
 
 ---
 
-## 4. Link loss (safety path)
+## 5. Link loss (safety path)
 
 The car must never scan or publish without a live link.
 
@@ -122,7 +148,7 @@ sequenceDiagram
 
 ---
 
-## 5. Display path (every loop pass)
+## 6. Display path (every loop pass)
 
 ```mermaid
 sequenceDiagram
@@ -148,7 +174,7 @@ Display is passive: it only reads state, never publishes or moves anything.
 
 ---
 
-## 6. PC tool data roles
+## 7. PC tool data roles
 
 | Tool | Publishes | Subscribes | Drives the car? |
 | ---- | --------- | ---------- | --------------- |

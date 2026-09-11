@@ -40,6 +40,8 @@ This file records committed decisions and open (TBD) items. Agents should build 
 | 29 | PC GUI | Phase 5 test harness = PyQtGraph viewer in `tools/`; desktop is not the target platform (future: web/mobile); the protocol is the durable interface | Phase 5 |
 | 30 | On-car display | 16×2 HD44780 + PCF8574 I2C (SDA=21, SCL=22), status-only, auto-rotating pages | Phase 5 |
 | 31 | Display abstraction | Render via generic `TextDisplay` interface; `StatusDisplay` is display-agnostic so a future OLED/20×4 is a drop-in driver | Phase 5 |
+| 32 | Steering servo range | Pin 16; physical linkage limits servo travel to `[40°, 140°]` (90° = wheels straight) | Phase 1 |
+| 33 | STEER mapping | `STEER {angle}` maps 1:1 to servo degrees relative to straight (0→90°, +50→140°, −50→40°); wheel `δ_max` (TBD #2) will be re-mapped later | Phase 1/2 |
 
 ---
 
