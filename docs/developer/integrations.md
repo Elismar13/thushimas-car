@@ -81,9 +81,14 @@ Gitignored; template `include/config.example.h`. Read at compile time by
 | `knolleary/PubSubClient` | `lib/MqttTransport` | MQTT client |
 | `bblanchon/ArduinoJson` | `src/main.cpp` | scan/status/command JSON |
 | `marcoschwartz/LiquidCrystal_I2C` | `lib/I2CLcdDisplay` | 16x2 I2C LCD |
+| `ArduinoOTA` (framework lib) | `lib/OtaService` | wireless flash over UDP 3232 |
 
 `lib_ignore` in the native env excludes hardware libs so tests link only pure
-code: `ServoControl, Ultrasonic, MqttTransport, SonarScan, I2CLcdDisplay`.
+code: `ServoControl, Ultrasonic, MqttTransport, SonarScan, I2CLcdDisplay,
+OtaService`.
+
+**Ports:** MQTT (TCP 1883) and OTA (UDP 3232, ArduinoOTA) coexist on the same
+Wi-Fi link without conflict.
 
 ---
 

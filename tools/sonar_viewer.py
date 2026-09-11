@@ -11,6 +11,8 @@ The car stays stopped until commanded, so this viewer can also drive it:
   S  -> publish START_SCAN to car/cmd
   X  -> publish STOP_SCAN
   P  -> publish PING
+  A  -> steer left (decrease STEER angle by --steer-step)
+  D  -> steer right (increase STEER angle by --steer-step)
   --auto-start sends START_SCAN as soon as it connects
 
 Progress is printed to the console so the script is never silently idle:
@@ -44,10 +46,13 @@ class _ScanBridge(QtCore.QObject):
 
 
 class ScanViewer:
-    def __init__(self, max_distance_mm=4000, cmd_topic="car/cmd", auto_start=False):
+    def __init__(self, max_distance_mm=4000, cmd_topic="car/cmd", auto_start=False,
+                 steer_step=10):
         self.app = pg.mkQApp()
         self.cmd_topic = cmd_topic
         self.auto_start = auto_start
+        self.steer_step = steer_step
+        self.steer_angle = 0
         self.win = pg.GraphicsLayoutWidget(show=True)
         self.win.setWindowTitle("Sonar scan - waiting for data...")
 
@@ -81,11 +86,21 @@ class ScanViewer:
                         activated=lambda: self.send_command("STOP_SCAN"))
         QtGui.QShortcut(QtGui.QKeySequence("p"), self.win,
                         activated=lambda: self.send_command("PING"))
+        QtGui.QShortcut(QtGui.QKeySequence("a"), self.win,
+                        activated=lambda: self.steer_by(-self.steer_step))
+        QtGui.QShortcut(QtGui.QKeySequence("d"), self.win,
+                        activated=lambda: self.steer_by(self.steer_step))
 
-    def send_command(self, command):
-        payload = json.dumps({"type": "command", "command": command})
-        self.client.publish(self.cmd_topic, payload, qos=1)
+    def send_command(self, command, **fields):
+        payload = {"type": "command", "command": command, **fields}
+        self.client.publish(self.cmd_topic, json.dumps(payload), qos=1)
         print("[viewer] sent %s -> %s" % (command, self.cmd_topic))
+
+    def steer_by(self, delta):
+        # Clamp to the steering servo travel: [-(140-90), +(140-90)] = [-50, 50].
+        self.steer_angle = max(-50, min(50, self.steer_angle + delta))
+        self.send_command("STEER", angle=self.steer_angle)
+        print("[viewer] steer angle %+dd" % self.steer_angle)
 
     def _add_polar_grid(self, plot, max_distance_mm):
         grid_pen = pg.mkPen((150, 150, 150, 80))
@@ -133,7 +148,7 @@ class ScanViewer:
         self.client.connect(broker, port)
         self.client.loop_start()
         print("[viewer] listening on %s (broker %s:%d)" % (topic, broker, port))
-        print("[viewer] keys: S=start scan, X=stop scan, P=ping")
+        print("[viewer] keys: S=start scan, X=stop scan, P=ping, A/D=steer")
         sys.exit(self.app.exec())
 
     def _on_connect(self, client, userdata, flags, reason_code, properties=None):
@@ -158,11 +173,14 @@ def main():
     parser.add_argument("--cmd-topic", default="car/cmd", help="MQTT topic for commands")
     parser.add_argument("--auto-start", action="store_true",
                         help="send START_SCAN as soon as connected")
+    parser.add_argument("--steer-step", type=int, default=10,
+                        help="degrees per A/D steer press (clamped to +/-50)")
     parser.add_argument("--max-distance", type=int, default=4000, help="plot range in mm")
     args = parser.parse_args()
 
     ScanViewer(max_distance_mm=args.max_distance, cmd_topic=args.cmd_topic,
-               auto_start=args.auto_start).start(args.broker, args.port, args.topic)
+               auto_start=args.auto_start,
+               steer_step=args.steer_step).start(args.broker, args.port, args.topic)
 
 
 if __name__ == "__main__":

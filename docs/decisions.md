@@ -42,6 +42,7 @@ This file records committed decisions and open (TBD) items. Agents should build 
 | 31 | Display abstraction | Render via generic `TextDisplay` interface; `StatusDisplay` is display-agnostic so a future OLED/20×4 is a drop-in driver | Phase 5 |
 | 32 | Steering servo range | Pin 16; physical linkage limits servo travel to `[40°, 140°]` (90° = wheels straight) | Phase 1 |
 | 33 | STEER mapping | `STEER {angle}` maps 1:1 to servo degrees relative to straight (0→90°, +50→140°, −50→40°); wheel `δ_max` (TBD #2) will be re-mapped later | Phase 1/2 |
+| 34 | OTA updates | Wireless flash via ArduinoOTA protocol (UDP 3232), driven by PlatformIO `espota` (`pio run -t upload --upload-port <ip>`); coexists with MQTT (TCP 1883); first flash still via USB | Phase 2+ |
 
 ---
 

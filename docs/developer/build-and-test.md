@@ -12,6 +12,27 @@ PlatformIO is at `~/.platformio/penv/bin/pio` (not on PATH by default).
 | Flash via USB | `~/.platformio/penv/bin/pio run -t upload` |
 | Serial monitor | `~/.platformio/penv/bin/pio monitor` (115200) |
 | Host unit tests | `~/.platformio/penv/bin/pio test -e native --without-uploading` |
+| Flash wirelessly (OTA) | `~/.platformio/penv/bin/pio run -t upload --upload-port <car-ip>` |
+
+### Wireless updates (OTA)
+
+The firmware runs the ArduinoOTA client (`lib/OtaService`, UDP 3232), which the
+PlatformIO `espota` uploader speaks. The espressif32 builder auto-switches to
+`espota` whenever `--upload-port` is an IP, so the same env also still flashes
+over USB (`-p /dev/ttyUSBx`).
+
+```bash
+# 1. ONCE: flash the OTA-enabled image over USB first
+~/.platformio/penv/bin/pio run -t upload
+
+# 2. Afterwards, wireless: pass the car's IP (serial "[net] Wi-Fi connected" line)
+~/.platformio/penv/bin/pio run -t upload --upload-port 192.168.x.y
+```
+
+* Timeout/rollback is built in: a bad image rolls back to the previous slot
+  automatically; USB re-flash always works as a final fallback.
+* The image must stay under the app partition (currently **1.31 MB**; flashing
+  a bigger one fails the build's size check).
 
 ---
 

@@ -98,4 +98,5 @@ Green = pure, hardware-free logic (also compiled by the native host tests).
 | Support a different display (OLED/20x4) | Implement `TextDisplay`, change the instantiation in `main.cpp` |
 | Add a unit-testable helper | Put pure logic in `lib/` (no Arduino calls), add a `test/test_<x>/` suite |
 | Change pin wiring | `src/main.cpp` pin constants + `docs/hardware.md` §3 (keep in sync) |
+| Flash the car wirelessly | `pio run -t upload --upload-port <ip>` (see `build-and-test.md`) |
 | Debug, flash, run tests | `docs/developer/build-and-test.md` |

@@ -139,6 +139,24 @@ scan 1234 published (26 points)
 If the servo does not sweep, the command never arrived — check the serial log
 for `command received: START_SCAN` (it only prints if the ESP32 parsed it).
 
+## 4.3 Wireless firmware updates (OTA)
+
+The first flash must be over USB; afterwards the car can be flashed over Wi-Fi
+via PlatformIO's built-in `espota` uploader (no extra tooling — it detects the
+IP and switches automatically).
+
+```bash
+# once: USB
+~/.platformio/penv/bin/pio run -t upload
+
+# afterwards: wireless, using the car's IP (serial "[net] Wi-Fi connected" line)
+~/.platformio/penv/bin/pio run -t upload --upload-port 192.168.x.y
+```
+
+The scan/servo stops automatically when an update starts, and the car reboots
+into the new image (MQTT reconnects as usual). A bad image rolls back
+automatically; USB re-flash always remains available.
+
 ## 5. Troubleshooting
 
 | Symptom | Cause / fix |
@@ -151,3 +169,5 @@ for `command received: START_SCAN` (it only prints if the ESP32 parsed it).
 | `[net] scan publish FAILED` right before `scan ... published` | Scan JSON (~1.7 kB) exceeds PubSubClient's default 256-byte buffer. Firmware sets `MQTT_MAX_PACKET_SIZE=2048` in `platformio.ini`; reflash. |
 | Viewer crashes with `qt.qpa.plugin ... xcb-cursor0 is needed` | Qt6 needs `libxcb-cursor0` on Linux: `sudo apt install libxcb-cursor0`. |
 | `pio test` runs no tests | Use the native env: `~/.platformio/penv/bin/pio test -e native --without-uploading`. |
+| OTA upload fails / times out | Wrong IP, or the car on a different subnet; or the running image predates OTA support — re-flash over USB once, then retry. |
+| Boot loop: `assert failed: tcpip_send_msg_wait_sem ... (Invalid mbox)` + backtrace through `ArduinoOTAClass::begin` | The OTA client was started before Wi-Fi/lwip was up. Fixed in firmware (`ota.begin()` is now deferred until the first Wi-Fi connect); re-flash via USB. |

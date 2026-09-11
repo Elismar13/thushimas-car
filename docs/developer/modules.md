@@ -17,6 +17,7 @@ graph LR
     main --> lcd["I2CLcdDisplay"]
     main --> disp["StatusDisplay"]
     main --> sd["ScanData"]
+    main --> ota["OtaService"]
 
     scan --> sd
     scan --> servoc["ServoControl"]
@@ -30,6 +31,7 @@ graph LR
     mqtt --> ext3["PubSubClient (lib_dep)"]
     main --> ext4["ArduinoJson (lib_dep)"]
     lcd --> ext5["LiquidCrystal_I2C (lib_dep)"]
+    ota --> ext6["ArduinoOTA (framework)"]
 
     classDef pure fill:#e8f5e9,stroke:#2e7d32
     class sd,disp,txt pure
@@ -128,6 +130,22 @@ State machine: see [state-and-lifecycle.md](state-and-lifecycle.md).
 ---
 
 ## Communication
+
+### `lib/OtaService` — wireless updates (UDP 3232)
+
+Thin wrapper over the ESP32 ArduinoOTA client from the framework library. It
+lets PlatformIO flash the car over Wi-Fi; see [build-and-test.md](build-and-test.md)
+for the exact command. Runs alongside MQTT (different port/protocol).
+
+| Public API | Notes |
+| ---------- | ----- |
+| `OtaService(const char* hostname)` | sets the OTA/mDNS hostname (uses `MQTT_CLIENT_ID`) |
+| `begin()` | register `onStart`, `ArduinoOTA.begin()`. **Idempotent and must only run after Wi-Fi/lwip is up** (ArduinoOTA binds UDP 3232, which panics if the network stack isn't initialized); `main.cpp` calls it on first Wi-Fi connect |
+| `handle()` | service the update; call from `loop()` (no-op until `begin()`) |
+| `setOnStart(std::function<void()>)` | called before the flash — `main.cpp` uses it to stop the scanner |
+
+After the image is written the ESP32 reboots and reconnects MQTT. No password
+provisioned yet (LAN-only).
 
 ### `lib/MqttTransport` — Wi-Fi + MQTT
 

@@ -4,6 +4,7 @@
 #include "config.h"
 #include "I2CLcdDisplay.h"
 #include "MqttTransport.h"
+#include "OtaService.h"
 #include "SonarScan.h"
 #include "StatusDisplay.h"
 
@@ -38,11 +39,13 @@ MqttTransport mqtt(WIFI_SSID, WIFI_PASSWORD, MQTT_BROKER_HOST, MQTT_BROKER_PORT,
                    MQTT_CLIENT_ID, kCmdTopic, kScanTopic, kStatusTopic);
 I2CLcdDisplay lcd(kLcdAddress, kLcdCols, kLcdRows);
 StatusDisplay display(lcd);
+OtaService ota(MQTT_CLIENT_ID);
 
 static uint32_t scanCount = 0;
 static int lastPointCount = 0;
 static uint16_t lastNearestMm = 0;
 static int lastNearestBearing = 0;
+static bool otaStarted = false;
 
 void publishScan(const ScanData& scan) {
     DynamicJsonDocument doc(2048);
@@ -129,6 +132,12 @@ void setup() {
     lcd.begin();
     display.begin();
 
+    // Stop any scanning before an over-the-air flash; reboot happens after.
+    ota.setOnStart([]() {
+        scanner.stop();
+        Serial.println("[ota] update starting, scanner stopped");
+    });
+
     mqtt.setCommandCallback(handleCommand);
     mqtt.begin();
 
@@ -137,6 +146,16 @@ void setup() {
 
 void loop() {
     mqtt.loop();
+
+    // ArduinoOTA must not open its UDP socket before the network stack is up;
+    // start it only once Wi-Fi connects (see OtaService.begin notes).
+    if (!otaStarted && mqtt.wifiConnected()) {
+        otaStarted = true;
+        ota.begin();
+        Serial.println("[ota] OTA service ready (UDP 3232)");
+    }
+
+    ota.handle();
 
     if (mqtt.connected()) {
         ScanData scan;

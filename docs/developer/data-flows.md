@@ -13,6 +13,7 @@ sequenceDiagram
     participant S as SonarScan
     participant M as MqttTransport
     participant W as WiFi (ESP32)
+    participant O as OtaService
     participant B as Broker (PC)
 
     P->>S: setup(): begin() + setStepDegrees(15) + setSettleMs(300)
@@ -22,6 +23,10 @@ sequenceDiagram
     loop every loop()
         M->>W: WiFi.status()?
         W-->>M: WL_CONNECTED
+        alt first connection
+            P->>O: ota.begin() (once Wi-Fi/lwip is up; UDP 3232)
+            Note over O: ArduinoOTA binds its UDP socket here, never before
+        end
         M->>B: mqtt.connect(clientId)
         M->>B: subscribe(car/cmd)
         M-->>P: connected() == true
