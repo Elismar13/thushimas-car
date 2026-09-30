@@ -161,7 +161,7 @@ sequenceDiagram
     participant M as MqttTransport
     participant S as SonarScan
     participant D as StatusDisplay
-    participant X as I2CLcdDisplay (LCD)
+    participant X as Ssd1306Display (OLED)
 
     L->>M: wifiConnected() / connected()
     L->>S: scanning()
@@ -169,7 +169,7 @@ sequenceDiagram
     Note over L: build StatusDisplay::State
     L->>D: display.tick(millis(), state)
     alt rotation due (every 3000 ms) or first run
-        D->>X: printLine(0, line1) / printLine(1, line2)
+        D->>X: printLine(row, text) for each row of the page
     else
         Note over X: nothing written (page unchanged)
     end

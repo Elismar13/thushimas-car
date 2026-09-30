@@ -28,7 +28,7 @@ lib/
   SonarScan/            # head-sweep state machine (hardware tick)
   MqttTransport/        # Wi-Fi + MQTT connect/reconnect/publish wrapper
   TextDisplay/          # abstract character-grid display interface
-  I2CLcdDisplay/        # 16x2 I2C LCD driver (TextDisplay impl)
+  Ssd1306Display/       # 128x64 SSD1306 I2C OLED driver (TextDisplay impl)
   StatusDisplay/        # pure page renderer for the on-car display
 tools/
   sonar_viewer.py       # PC GUI: subscribes car/scan, sends commands
@@ -36,7 +36,7 @@ tools/
   requirements.txt      # PC tool dependencies
 test/
   test_sonar/           # ScanData unit tests (8 cases, host)
-  test_display/         # StatusDisplay + nearestObstacle tests (6 cases, host)
+  test_display/         # StatusDisplay + nearestObstacle tests (7 cases, host)
 docs/                   # project + developer documentation
 ```
 
@@ -60,7 +60,7 @@ flowchart TB
         scan["lib/SonarScan"]
         sdata["lib/ScanData<br/>(pure)"]
         disp["lib/StatusDisplay<br/>(pure)"]
-        lcd["lib/I2CLcdDisplay"]
+        oled["lib/Ssd1306Display"]
         txt["lib/TextDisplay"]
         sv["lib/ServoControl"]
         us["lib/Ultrasonic"]
@@ -74,8 +74,8 @@ flowchart TB
     scan --> sv
     scan --> us
     disp --> txt
-    main --> lcd
-    lcd --> txt
+    main --> oled
+    oled --> txt
 
     classDef pure fill:#e8f5e9,stroke:#2e7d32
     class sdata,disp,txt pure
@@ -94,8 +94,8 @@ Green = pure, hardware-free logic (also compiled by the native host tests).
 | Add a new command | `src/main.cpp` `handleCommand()`; extend `communication.md` command list |
 | Trim/range a servo (e.g. steering travel) | `src/main.cpp` constants (e.g. `kSteerMinAngle`/`kSteerMaxAngle`) + `ServoControl` ctor defaults |
 | Change the MQTT reconnect behavior | `lib/MqttTransport/MqttTransport.cpp` `loop()` / `connectBroker()` |
-| Add a display page | `lib/StatusDisplay/StatusDisplay.cpp` `renderPage()` + `pageCount()` |
-| Support a different display (OLED/20x4) | Implement `TextDisplay`, change the instantiation in `main.cpp` |
+| Add a display page | `lib/StatusDisplay/StatusDisplay.cpp` `renderPage()` (dispatches to `renderCompact()`/`renderFull()`) + `pageCount()` |
+| Support a different display | Implement `TextDisplay`, change the instantiation in `main.cpp` |
 | Add a unit-testable helper | Put pure logic in `lib/` (no Arduino calls), add a `test/test_<x>/` suite |
 | Change pin wiring | `src/main.cpp` pin constants + `docs/hardware.md` §3 (keep in sync) |
 | Flash the car wirelessly | `pio run -t upload --upload-port <ip>` (see `build-and-test.md`) |

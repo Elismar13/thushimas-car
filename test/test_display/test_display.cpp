@@ -44,6 +44,44 @@ private:
     char grid_[2][17];
 };
 
+// 21x8 stub matching the SSD1306 128x64 text grid, for the multi-line layout.
+class WideFakeDisplay : public TextDisplay {
+public:
+    WideFakeDisplay() { clear(); }
+
+    int rows() const override { return 8; }
+    int cols() const override { return 21; }
+    void setCursor(int row, int col) override { (void)row; (void)col; }
+    void print(const char* text) override { (void)text; }
+
+    void printLine(int row, const char* text) override {
+        int n = 0;
+        while (text[n] && n < 21) {
+            grid_[row][n] = text[n];
+            ++n;
+        }
+        while (n < 21) {
+            grid_[row][n] = ' ';
+            ++n;
+        }
+        grid_[row][21] = '\0';
+    }
+
+    void clear() {
+        for (int r = 0; r < 8; ++r) {
+            for (int c = 0; c < 21; ++c) {
+                grid_[r][c] = ' ';
+            }
+            grid_[r][21] = '\0';
+        }
+    }
+
+    const char* line(int row) const { return grid_[row]; }
+
+private:
+    char grid_[8][22];
+};
+
 void test_nearest_ignores_no_echo(void) {
     ScanBuilder b;
     b.add(0, 1, 0);      // no echo
@@ -122,6 +160,25 @@ void test_display_nearest_page(void) {
     TEST_ASSERT_TRUE(strncmp(disp.line(1), "@ 045deg", 8) == 0);
 }
 
+void test_display_full_status_page(void) {
+    WideFakeDisplay disp;
+    StatusDisplay sd(disp);
+    StatusDisplay::State st;
+    st.wifiConnected = true;
+    st.mqttConnected = false;
+    st.scanning = true;
+    st.scanCount = 42;
+
+    sd.begin();
+    sd.tick(0, st);  // page 0 (status), full multi-line layout
+
+    TEST_ASSERT_TRUE(strncmp(disp.line(0), "CAR STATUS", 10) == 0);
+    TEST_ASSERT_TRUE(strncmp(disp.line(2), "MODE  : SCAN ON", 15) == 0);
+    TEST_ASSERT_TRUE(strncmp(disp.line(3), "WIFI  : OK", 10) == 0);
+    TEST_ASSERT_TRUE(strncmp(disp.line(4), "MQTT  : NO", 10) == 0);
+    TEST_ASSERT_TRUE(strncmp(disp.line(5), "SCANS : 42", 10) == 0);
+}
+
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_nearest_ignores_no_echo);
@@ -130,5 +187,6 @@ int main() {
     RUN_TEST(test_display_status_page);
     RUN_TEST(test_display_rotates_pages);
     RUN_TEST(test_display_nearest_page);
+    RUN_TEST(test_display_full_status_page);
     return UNITY_END();
 }

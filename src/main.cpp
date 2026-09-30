@@ -2,10 +2,10 @@
 #include <ArduinoJson.h>
 
 #include "config.h"
-#include "I2CLcdDisplay.h"
 #include "MqttTransport.h"
 #include "OtaService.h"
 #include "SonarScan.h"
+#include "Ssd1306Display.h"
 #include "StatusDisplay.h"
 
 static constexpr uint8_t kHeadServoPin = 17;
@@ -16,18 +16,20 @@ static constexpr uint8_t kEcho1Pin = 26;
 static constexpr uint8_t kTrig2Pin = 32;
 static constexpr uint8_t kEcho2Pin = 33;
 
-static constexpr int kScanStepDegrees = 15;
-static constexpr uint32_t kSettleMs = 300;
+static constexpr int kScanStepDegrees = 20;
+static constexpr uint32_t kSettleMs = 125;
 
 // Steering servo travel, limited by the physical steering linkage. 90° = wheels
 // straight. STEER angle maps 1:1: STEER 0 -> 90°, STEER +50 -> 140°, -50 -> 40°.
 static constexpr int kSteerMinAngle = 40;
 static constexpr int kSteerMaxAngle = 140;
 
-// On-car status display (16x2 HD44780 via PCF8574 I2C backpack).
-static constexpr uint8_t kLcdAddress = 0x27;
-static constexpr int kLcdCols = 16;
-static constexpr int kLcdRows = 2;
+// On-car status display (SSD1306 128x64 monochrome OLED over I2C).
+static constexpr uint8_t kOledAddress = 0x3C;
+static constexpr int kOledWidth = 128;
+static constexpr int kOledHeight = 64;
+static constexpr int kI2cSdaPin = 21;
+static constexpr int kI2cSclPin = 22;
 
 static constexpr const char* kCmdTopic = "car/cmd";
 static constexpr const char* kScanTopic = "car/scan";
@@ -37,8 +39,9 @@ SonarScan scanner(kHeadServoPin, kTrig1Pin, kEcho1Pin, kTrig2Pin, kEcho2Pin);
 ServoControl steerServo(kSteerServoPin, kSteerMinAngle, kSteerMaxAngle);
 MqttTransport mqtt(WIFI_SSID, WIFI_PASSWORD, MQTT_BROKER_HOST, MQTT_BROKER_PORT,
                    MQTT_CLIENT_ID, kCmdTopic, kScanTopic, kStatusTopic);
-I2CLcdDisplay lcd(kLcdAddress, kLcdCols, kLcdRows);
-StatusDisplay display(lcd);
+Ssd1306Display oled(kOledAddress, kOledWidth, kOledHeight, kI2cSdaPin,
+                   kI2cSclPin);
+StatusDisplay display(oled);
 OtaService ota(MQTT_CLIENT_ID);
 
 static uint32_t scanCount = 0;
@@ -129,7 +132,7 @@ void setup() {
 
     steerServo.begin();  // parks at 90° (wheels straight) at boot
 
-    lcd.begin();
+    oled.begin();
     display.begin();
 
     // Stop any scanning before an over-the-air flash; reboot happens after.

@@ -14,7 +14,7 @@ glue — see [data-flows.md](data-flows.md) for what it orchestrates.
 graph LR
     main["src/main.cpp"] --> mqtt["MqttTransport"]
     main --> scan["SonarScan"]
-    main --> lcd["I2CLcdDisplay"]
+    main --> oled["Ssd1306Display"]
     main --> disp["StatusDisplay"]
     main --> sd["ScanData"]
     main --> ota["OtaService"]
@@ -24,13 +24,13 @@ graph LR
     scan --> us["Ultrasonic"]
 
     disp --> txt["TextDisplay"]
-    lcd --> txt
+    oled --> txt
 
     servoc --> ext1["ESP32Servo (lib_dep)"]
     us --> ext2["NewPing (lib_dep)"]
     mqtt --> ext3["PubSubClient (lib_dep)"]
     main --> ext4["ArduinoJson (lib_dep)"]
-    lcd --> ext5["LiquidCrystal_I2C (lib_dep)"]
+    oled --> ext5["Adafruit_SSD1306 (lib_dep)"]
     ota --> ext6["ArduinoOTA (framework)"]
 
     classDef pure fill:#e8f5e9,stroke:#2e7d32
@@ -182,22 +182,25 @@ implements this; rendering logic never sees the physical device.
 | `print(const char*)` | raw text at cursor |
 | `printLine(row, text)` | clear line, print `text`, truncate > cols |
 
-### `lib/I2CLcdDisplay` — 16x2 I2C LCD driver
+### `lib/Ssd1306Display` — 128x64 I2C OLED driver
 
-`TextDisplay` implementation wrapping `LiquidCrystal_I2C` (marcoschwartz),
-PCF8574 backpack, default address `0x27`.
+`TextDisplay` implementation wrapping `Adafruit_SSD1306` + `Adafruit_GFX`,
+default address `0x3C`. Buffered panel: `printLine()` flushes the framebuffer
+and skips the I2C write when the row is unchanged.
 
 | Public API | Notes |
 | ---------- | ----- |
-| `I2CLcdDisplay(uint8_t address, int cols, int rows)` | 16 × 2 for this car |
-| `begin()` | `init()` + `backlight()` + clear |
+| `Ssd1306Display(uint8_t address, int width, int height, int sda=21, int scl=22)` | 128 × 64 for this car |
+| `begin()` | `Wire.begin(sda, scl)` + init + clear |
 
-Wiring: SDA = GPIO21, SCL = GPIO22, VCC = 5 V logic rail, GND. Long runs may
-need ~4.7 kΩ pull-ups (see `docs/hardware.md` §4).
+Wiring: SDA = GPIO21, SCL = GPIO22, VCC = 3.3 V, GND. Long runs may need
+~4.7 kΩ pull-ups (see `docs/hardware.md` §4).
 
 ### `lib/StatusDisplay` — pure page renderer (host-tested)
 
 Takes any `TextDisplay` + a `State` struct and renders 3 auto-rotating pages.
+Pages adapt to the display size: a compact two-line layout on a 2-row display,
+or a fuller multi-line layout on a taller panel (e.g. the 128x64 OLED).
 Status-only: reads state, never issues commands.
 
 | Public API | Notes |

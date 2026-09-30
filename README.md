@@ -120,9 +120,9 @@ communication layer:
   the protocol. The scan schema in `docs/communication.md` is the durable
   interface; the desktop viewer is only a test harness for the future
   web/mobile UI.
-* An on-car 16×2 I2C LCD (SDA=21/SCL=22) shows PC-independent status: Wi-Fi/MQTT
+* An on-car 128×64 I2C OLED (SDA=21/SCL=22) shows PC-independent status: Wi-Fi/MQTT
   link, scan count, nearest obstacle. Rendered through a display-agnostic
-  interface so it can later be swapped for an OLED or larger LCD.
+  interface so the panel can be swapped without touching the render logic.
 
 Wi-Fi credentials and broker address go in `include/config.h` (gitignored —
 copy from `include/config.example.h`).

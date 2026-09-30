@@ -40,8 +40,8 @@ drops publishes — this was a real bug, see `git log a916730`).
 | Ultrasonic 1 ECHO | 26 | `kEcho1Pin` | matches (5 V → level-shift!) |
 | Ultrasonic 2 TRIG | 32 | `kTrig2Pin` | matches |
 | Ultrasonic 2 ECHO | 33 | `kEcho2Pin` | matches (5 V → level-shift!) |
-| I2C SDA | 21 | ESP32 default (LiquidCrystal_I2C uses `Wire`) | matches (`hardware.md` §4) |
-| I2C SCL | 22 | ESP32 default | matches |
+| I2C SDA | 21 | `Ssd1306Display` uses `Wire` | matches (`hardware.md` §4) |
+| I2C SCL | 22 | `Ssd1306Display` uses `Wire` | matches |
 | E-stop button | 4 | — (Phase 1) | matches |
 | L298N ENA/IN1/IN2 | 13/14/27 | — (Phase 1) | matches |
 
@@ -80,11 +80,11 @@ Gitignored; template `include/config.example.h`. Read at compile time by
 | `madhephaestus/ESP32Servo` | `lib/ServoControl` | 50 Hz servo PWM |
 | `knolleary/PubSubClient` | `lib/MqttTransport` | MQTT client |
 | `bblanchon/ArduinoJson` | `src/main.cpp` | scan/status/command JSON |
-| `marcoschwartz/LiquidCrystal_I2C` | `lib/I2CLcdDisplay` | 16x2 I2C LCD |
+| `adafruit/Adafruit SSD1306` + `adafruit/Adafruit GFX Library` | `lib/Ssd1306Display` | 128x64 I2C OLED |
 | `ArduinoOTA` (framework lib) | `lib/OtaService` | wireless flash over UDP 3232 |
 
 `lib_ignore` in the native env excludes hardware libs so tests link only pure
-code: `ServoControl, Ultrasonic, MqttTransport, SonarScan, I2CLcdDisplay,
+code: `ServoControl, Ultrasonic, MqttTransport, SonarScan, Ssd1306Display,
 OtaService`.
 
 **Ports:** MQTT (TCP 1883) and OTA (UDP 3232, ArduinoOTA) coexist on the same
@@ -114,7 +114,7 @@ Mosquitto `listener 1883 0.0.0.0` + `allow_anonymous true` on the PC — see
 | Scan data model, nearest obstacle | `lib/ScanData` | — | — |
 | Head sweep timing/measurement | — | `lib/SonarScan` (+`ServoControl`, `Ultrasonic`) | — |
 | MQTT/Wi-Fi | — | `lib/MqttTransport` | broker + tools |
-| Display rendering | `lib/StatusDisplay` (+`TextDisplay`) | `lib/I2CLcdDisplay` | — |
+| Display rendering | `lib/StatusDisplay` (+`TextDisplay`) | `lib/Ssd1306Display` | — |
 | JSON schema | (mirrored in docs) | `src/main.cpp` ArduinoJson | `tools/*.py` json |
 
 **Rule of thumb:** keep units mm/degrees; keep `ScanData`-style logic pure so it

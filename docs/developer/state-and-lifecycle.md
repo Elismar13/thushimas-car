@@ -96,4 +96,5 @@ Simple timer-driven rotation, no state machine of its own:
 * `tick(nowMs, state)` renders the *current* page on first call, then advances
   `currentPage = (currentPage + 1) % 3` every `kRotateIntervalMs` (3000 ms).
 * Rendering is idempotent: `printLine()` rewrites the row in place, so no
-  diffing bothers — the LCD just gets overwritten on every page change.
+  diffing bothers — the panel just gets overwritten on every page change. Pages
+  adapt to the display size (compact 2-line vs. fuller multi-line).

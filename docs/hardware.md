@@ -26,7 +26,7 @@ The kinematic model is documented in `docs/architecture.md` (§ Kinematic Model)
 | Wheels                     | 2 driven rear, 2 steered front              | Movement                 | TBD     |
 | Battery                    | 2× 18650 (7.4 V nominal)                    | Power                    | DECIDED |
 | Voltage regulation         | Motor rail + logic rail (separate 5 V buck) | Power                    | DECIDED |
-| Status display              | 16×2 HD44780 LCD w/ PCF8574 I2C backpack | On-car status screen | DECIDED |
+| Status display              | 128×64 monochrome SSD1306 OLED (I2C)       | On-car status screen     | DECIDED |
 | Emergency stop             | Physical push button (wired to ESP32 GPIO)  | Safety                   | DECIDED |
 | Motor encoder              | On the rear drive motor                     | Odometry (Phase 7)       | TBD     |
 
@@ -52,9 +52,9 @@ Proposed allocation for the ESP32 DevKit V1 (WROOM-32). Adjust during wiring if 
 | E-stop button        | 4     | INPUT_PULLUP, active low, wired to GND                        |
 | Encoder A (future)   | 34    | Input-only, interrupt-capable, for Phase 7                    |
 | Encoder B (future)   | 35    | Input-only, interrupt-capable, for Phase 7                    |
-| I2C SDA (future)     | 21    | Reserved for IMU or similar                                   |
-| I2C SCL (future)     | 22    | Reserved for IMU or similar                                   |
-| Status display       | 21/22 | HD44780 via PCF8574 I2C backpack (SDA=21, SCL=22), @ 0x27    |
+| I2C SDA              | 21    | Shared I2C bus (status OLED now; IMU may join later)          |
+| I2C SCL              | 22    | Shared I2C bus (status OLED now; IMU may join later)          |
+| Status display       | 21/22 | SSD1306 128×64 OLED over I2C (SDA=21, SCL=22), @ 0x3C         |
 | UART0                | 1/3   | Built-in USB serial for debug                                 |
 
 Constraints respected:
@@ -68,28 +68,30 @@ Constraints respected:
 
 ## 4. On-car Status Display
 
-A 16×2 HD44780 character LCD (common "I2C LCM" module with a PCF8574 backpack)
-shows on-car status that does not depend on the PC. It is **status-only**: it
-reads state and never issues movement or scan commands, so safety behavior is
-unaffected.
+A 128×64 monochrome SSD1306 OLED shows on-car status that does not depend on the
+PC. It is **status-only**: it reads state and never issues movement or scan
+commands, so safety behavior is unaffected.
 
-* Wires: **SDA = GPIO21**, **SCL = GPIO22**, VCC from the 5 V logic rail, GND.
-* Default backpack address `0x27` (configurable in `src/main.cpp`).
+* Wires: **SDA = GPIO21**, **SCL = GPIO22**, **VCC = 3.3 V**, GND.
+* Default I2C address `0x3C` (some modules use `0x3D`; configurable in `src/main.cpp`).
 * For long I2C runs, add ~4.7 kΩ pull-ups on SDA/SCL to 3.3 V.
+* The panel is a **21×8 character grid** using the classic 6×8 GFX font.
 
 The abstraction is display-agnostic: `lib/StatusDisplay` renders text against a
 generic `TextDisplay` interface (`lib/TextDisplay`). The concrete driver
-`lib/I2CLcdDisplay` wraps the `LiquidCrystal_I2C` library. Migrating to a
-20×4 LCD or an OLED later means adding another `TextDisplay` implementation and
-changing one instantiation, not the rendering logic.
+`lib/Ssd1306Display` wraps the `Adafruit_SSD1306` + `Adafruit_GFX` libraries.
+Migrating to a different panel means adding another `TextDisplay` implementation
+and changing one instantiation, not the rendering logic.
 
-Auto-rotates three status pages every ~3 s:
+Auto-rotates three status pages every ~3 s. Each page adapts to the display: a
+compact two-line layout on a 2-row character LCD, or the fuller layout below on
+the 128×64 OLED.
 
-| Page | Row 1 | Row 2 |
-| ---- | ----- | ----- |
-| Status | `IDLE` / `SCAN ON` | `WIFI:ok MQTT:ok` |
-| Scan | `scan #1234` | `pts: 26` |
-| Nearest | `near 1234mm` | `@ 045deg` |
+| Page | Compact (2 rows × 16 cols) | OLED (21×8) |
+| ---- | -------------------------- | ----------- |
+| Status | `IDLE` / `SCAN ON`; `WIFI:ok MQTT:ok` | `CAR STATUS`; `MODE  : SCAN ON`/`IDLE`; `WIFI  : OK`/`NO`; `MQTT  : OK`/`NO`; `SCANS : n` |
+| Scan | `scan #1234`; `pts: 26` | `SCAN`; `COUNT : n`; `POINTS: n` |
+| Nearest | `near 1234mm`; `@ 045deg` | `NEAREST`; `DIST  : n mm`/`-- mm`; `BEAR  : nnn deg`/`---` |
 
 ---
 
@@ -109,6 +111,7 @@ Two independent rails:
 
 * Motor rail: 7.4 V directly to the L298N. Do not draw logic power from it.
 * Logic rail: separate 5 V buck for ESP32 (via VIN), the two SG90 servos, and both HC-SR04s.
+* The SSD1306 OLED is **3.3 V**: power it from the ESP32 3.3 V pin (small current). Do not feed 5 V to a bare 3.3 V panel.
 * The L298N has an onboard 5 V regulator; it is available but **should not be the primary logic supply** to avoid brownouts when the motor draws current.
 * Add a bulk capacitor (e.g. 470–1000 µF) across the motor rail near the L298N.
 * SG90 servos must share a rail with enough current for two servos under load.

@@ -5,11 +5,12 @@
 #include "TextDisplay.h"
 
 // Pure, hardware-free renderer that displays car status on any TextDisplay.
-// Renders and auto-rotates a fixed set of 16-char pages on a timer. Reads
-// state only; never issues movement or scan commands, so it cannot affect
-// safety behavior.
+// Renders and auto-rotates a fixed set of pages on a timer. Each page adapts to
+// the display size: a compact two-line layout on a 2-row character LCD, or a
+// fuller multi-line layout on a taller panel such as a 128x64 OLED. Reads state
+// only; never issues movement or scan commands, so it cannot affect safety.
 //
-// Unit-testable on the native environment: it never touches the LCD library,
+// Unit-testable on the native environment: it never touches a display library,
 // only the TextDisplay interface.
 class StatusDisplay {
 public:
@@ -45,6 +46,10 @@ public:
 
 private:
     void renderPage(int page, const State& state);
+    // Compact two-line layout, used when the display has <= 2 rows.
+    void renderCompact(int page, const State& state);
+    // Fuller multi-line layout, used when the display has more than 2 rows.
+    void renderFull(int page, const State& state);
 
     TextDisplay& display_;
     int rows_;

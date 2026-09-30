@@ -43,13 +43,13 @@ flowchart LR
     subgraph esp32dev["[env:esp32dev]"]
         A["platform = espressif32 / esp32dev<br/>framework = arduino"]
         B["build_flags: -DMQTT_MAX_PACKET_SIZE=2048<br/>(scan payload ~1.7 kB, PubSubClient default 256 B)"]
-        C["lib_deps: NewPing, ESP32Servo,<br/>PubSubClient, ArduinoJson, LiquidCrystal_I2C"]
+        C["lib_deps: NewPing, ESP32Servo,<br/>PubSubClient, ArduinoJson, Adafruit_SSD1306"]
         A --> B --> C
     end
     subgraph native["[env:native]"]
         D["platform = native, unity test framework"]
         E["build_src_filter = -<*>  (no src/main.cpp)"]
-        F["lib_ignore: ServoControl, Ultrasonic,<br/>MqttTransport, SonarScan, I2CLcdDisplay"]
+        F["lib_ignore: ServoControl, Ultrasonic,<br/>MqttTransport, SonarScan, Ssd1306Display"]
         D --> E --> F
     end
 ```
@@ -64,7 +64,7 @@ ESP32 APIs is ignored, so the tests link and run on the host.
 | Suite | File | Cases | Covers |
 | ----- | ---- | ----- | ------ |
 | `test_sonar` | `test/test_sonar/test_sonar.cpp` | 8 | `bearingFor()` (opposed sensors, wrapping), `ScanBuilder` (count, sort+stamp, reset), full-sweep 26-point invariant |
-| `test_display` | `test/test_display/test_display.cpp` | 6 | `nearestObstacle()` (ignores no-echo, all-no-echo, empty), `StatusDisplay` page rendering + page rotation (via a `FakeDisplay` `TextDisplay` stub) |
+| `test_display` | `test/test_display/test_display.cpp` | 7 | `nearestObstacle()` (ignores no-echo, all-no-echo, empty), `StatusDisplay` page rendering + rotation (compact 2x16 and full 21x8 layouts, via `TextDisplay` stubs) |
 
 Tests use Unity (`TEST_ASSERT_*`) and `int main()` with `RUN_TEST(...)`.
 
