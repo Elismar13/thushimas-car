@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <Wire.h>
 
 #include "config.h"
 #include "MqttTransport.h"
@@ -124,6 +125,25 @@ void handleCommand(const char* topic, const uint8_t* payload, unsigned int lengt
     }
 }
 
+// I2C bring-up diagnostic: list every device on the bus, so a blank OLED can be
+// told apart from a wired-but-unaddressed one. Prints once at boot.
+static void scanI2cBus() {
+    Wire.begin(kI2cSdaPin, kI2cSclPin);
+    Serial.printf("[i2c] scan SDA=%d SCL=%d:", kI2cSdaPin, kI2cSclPin);
+    int found = 0;
+    for (uint8_t addr = 1; addr < 127; ++addr) {
+        Wire.beginTransmission(addr);
+        if (Wire.endTransmission() == 0) {
+            Serial.printf(" 0x%02X", addr);
+            ++found;
+        }
+    }
+    if (found == 0) {
+        Serial.print(" none");
+    }
+    Serial.printf(" (%d device%s)\n", found, found == 1 ? "" : "s");
+}
+
 void setup() {
     Serial.begin(115200);
     scanner.begin();
@@ -132,7 +152,10 @@ void setup() {
 
     steerServo.begin();  // parks at 90° (wheels straight) at boot
 
-    oled.begin();
+    scanI2cBus();
+    const bool oledOk = oled.begin();
+    Serial.printf("[oled] init %s (addr 0x%02X)\n", oledOk ? "OK" : "FAILED",
+                  oled.address());
     display.begin();
 
     // Stop any scanning before an over-the-air flash; reboot happens after.

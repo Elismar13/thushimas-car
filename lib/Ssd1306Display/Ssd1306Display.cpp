@@ -26,9 +26,16 @@ Ssd1306Display::Ssd1306Display(uint8_t address, int width, int height,
     }
 }
 
-void Ssd1306Display::begin() {
+bool Ssd1306Display::begin() {
     Wire.begin(sdaPin_, sclPin_);
-    oled_->begin(SSD1306_SWITCHCAPVCC, address_);
+    if (!oled_->begin(SSD1306_SWITCHCAPVCC, address_)) {
+        // Some modules strap the alternate address (0x3D vs 0x3C).
+        const uint8_t alt = (address_ == 0x3C) ? 0x3D : 0x3C;
+        if (!oled_->begin(SSD1306_SWITCHCAPVCC, alt)) {
+            return false;
+        }
+        address_ = alt;
+    }
     oled_->setTextColor(SSD1306_WHITE);
     oled_->setTextSize(1);
     oled_->clearDisplay();
@@ -36,6 +43,7 @@ void Ssd1306Display::begin() {
     for (int r = 0; r < kMaxRows; ++r) {
         lastLines_[r][0] = '\0';
     }
+    return true;
 }
 
 int Ssd1306Display::rows() const { return rows_; }

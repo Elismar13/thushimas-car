@@ -23,13 +23,19 @@ public:
     Ssd1306Display(uint8_t address, int width, int height,
                    int sdaPin = kDefaultSdaPin, int sclPin = kDefaultSclPin);
 
-    void begin();
+    // Initialize the panel. Returns false if the panel never ACKs (wrong
+    // address, wiring, or power). Retries the alternate strap address
+    // (0x3C <-> 0x3D) once before giving up.
+    bool begin();
 
     int rows() const override;
     int cols() const override;
     void setCursor(int row, int col) override;
     void print(const char* text) override;
     void printLine(int row, const char* text) override;
+
+    // The address actually in use after a successful begin().
+    uint8_t address() const { return address_; }
 
 private:
     // Classic GFX font cell: 5x7 glyph plus 1 px spacing.
