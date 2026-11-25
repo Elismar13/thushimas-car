@@ -117,19 +117,10 @@ replacement, not the original.
 | 75 | Step-up converter rating | Adds the rating to DECIDED #56: the converter supplies **5 V at ≥2 A continuous**, with **3 A (15 W) recommended** so a stalled motor and a stalled servo still fit. Its output is set to **5.0 V with a multimeter** before anything is connected. A single 5 V rail feeds every load | Hardware, power |
 | 76 | E-stop pin | The E-stop button is on **GPIO 4**, read with the internal pull-up and active low (DECIDED #64). This supersedes the parent spec's "input-only pin with the internal pull-up" wording: GPIO 34–39 are input-only but have **no** internal pull-up, so the pull-up and the pin cannot both be had there | Hardware, safety |
 | 77 | Plan of record | The branch's plan of record is **`docs/roadmap.md`** (the five phases) and **`docs/safety-matrix.md`** (one row per safety rule). The `main`-line roadmap is archived at `docs/archive/main-line-roadmap.md` and is not worked on. Every matrix row becomes at least one host test before the rule it describes is coded, and the safety core is not written until both documents are agreed | Process, testing |
-
----
-
-## Proposed — awaiting agreement
-
-These two rules follow from the parent spec, but the maintainer has not agreed
-the safety matrix yet (issue #4). They move to **Decided** when it is agreed,
-and until then the safety core is not written.
-
-| # | Rule | Proposal | Impact |
-| - | ---- | -------- | ------ |
 | 78 | Safety precedence | The safety core evaluates the rules in the order stated in `docs/safety-matrix.md` §3 — E-stop, latched stop, disarmed, stale car link, obstacle within the stop threshold, otherwise the requested throttle applies, slewed. A **critical battery** enters through the latched stop, with the battery as its reason; a **low battery** only warns | Safety, behaviour |
 | 79 | Steering under the stops | The steering angle is applied only when the car is armed, the car link is fresh, and neither the E-stop nor a latched stop is engaged; the **interlock leaves the steering angle applied**. In every other case the angle returns to straight (`docs/safety-matrix.md` §4) | Safety, behaviour |
+
+---
 
 ---
 

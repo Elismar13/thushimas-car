@@ -65,32 +65,17 @@ Avoid implementing future functionality prematurely.
 ## High-Level Architecture
 
 ```text
-                         USER
-                          │
-                          ▼
-                  ┌───────────────┐
-                  │ Visualization │
-                  │   & Control   │
-                  └───────┬───────┘
-                          │
-                     Wi-Fi / MQTT
-                          │
-                          ▼
-                  ┌───────────────┐
-                  │     Robot     │
-                  │               │
-                  │    ESP32      │
-                  └───────┬───────┘
-                          │
-          ┌───────────────┼────────────────┐
-          │               │                │
-          ▼               ▼                ▼
-      Actuators         Sensors        Communication
-          │               │
-          ▼               ▼
-   Rear motor       2× Ultrasonic /
-   2× servos        E-stop / encoder
+Phone browser
+     │ Wi-Fi / HTTP
+     ▼
+HTTP adapter ──► phone-facing protocol ──► safety core ──► hardware adapters
+                                               │
+                                               └─ rules, state and throttle ramp
 ```
+
+The safety core is pure logic: it performs no I/O and knows nothing about
+HTTP, PWM or pins. The phone-facing protocol sits behind an interface, so a
+future transport can replace HTTP without changing a safety rule.
 
 ---
 
@@ -116,27 +101,24 @@ This branch's plan of record is [`docs/roadmap.md`](docs/roadmap.md); the
 
 ---
 
-## Current Phase
+## Current Implementation
 
-**Phase 4/5 — Rotating sonar data transfer + visualization (in progress)**
+The branch is in **Phase 2 — Safety core**:
 
-The current objective is the sonar data path end-to-end, focusing on the
-communication layer:
+* the ESP32 serves `POST /api/control` and `GET /api/state` over HTTP;
+* every request is authenticated with a shared token and a strictly increasing
+  sequence counter;
+* the transport-neutral protocol sits behind an interface;
+* the pure safety core implements the disarmed and normal-driving rows and the
+  requested-to-actual throttle ramp;
+* the native host suites cover the safety core and protocol without hardware.
 
-* ESP32 produces structured 360° scans (wiper sweep of the dual opposed
-  HC-SR04s) and publishes them to `car/scan` over MQTT.
-* `START_SCAN` / `STOP_SCAN` commands drive continuous scanning; the car is
-  stopped and silent at boot.
-* PC tooling in `tools/` (`sonar_viewer.py`, `mock_scan_publisher.py`) validates
-  the protocol. The scan schema in `docs/communication.md` is the durable
-  interface; the desktop viewer is only a test harness for the future
-  web/mobile UI.
-* An on-car 128×64 I2C OLED (SDA=21/SCL=22) shows PC-independent status: Wi-Fi/MQTT
-  link, scan count, nearest obstacle. Rendered through a display-agnostic
-  interface so the panel can be swapped without touching the render logic.
+The motor adapter and phone page arrive in Phase 3. The obstacle interlock and
+physical E-stop arrive in Phase 4; until both exist, driving tests happen with
+the wheels off the ground.
 
-Wi-Fi credentials and broker address go in `include/config.h` (gitignored —
-copy from `include/config.example.h`).
+Wi-Fi credentials and the shared control token go in `include/config.h`
+(gitignored — copy from `include/config.example.h`).
 
 ---
 
@@ -144,8 +126,8 @@ copy from `include/config.example.h`).
 
 * [`docs/architecture.md`](docs/architecture.md) — system architecture, robot state, kinematic model, data flow
 * [`docs/hardware.md`](docs/hardware.md) — bill of materials, pin map, power architecture
-* [`docs/communication.md`](docs/communication.md) — MQTT/JSON protocol, topics, safety behavior
-* [`docs/local-development.md`](docs/local-development.md) — local setup: MQTT broker, PC tools, firmware config, end-to-end checks
+* [`docs/communication.md`](docs/communication.md) — HTTP control protocol, authentication and state snapshot
+* [`docs/local-development.md`](docs/local-development.md) — local setup: firmware config, host tests and HTTP checks
 * [`docs/roadmap.md`](docs/roadmap.md) — the branch's phases and their Definitions of Done
 * [`docs/safety-matrix.md`](docs/safety-matrix.md) — the safety rules, one row per situation
 * [`docs/decisions.md`](docs/decisions.md) — decided choices vs open (TBD) items
@@ -192,10 +174,9 @@ A single evolving PlatformIO firmware:
 
 ```text
 src/      # firmware source
-lib/      # libraries
+lib/      # firmware modules
 include/  # firmware public headers (incl. gitignored config.h)
-tools/    # PC-side tooling (MQTT viewer, mock publisher)
-test/     # unit tests
+test/     # host unit tests
 docs/     # project documentation
 ```
 

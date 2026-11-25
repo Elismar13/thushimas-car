@@ -1,100 +1,77 @@
 # Developer Guide — State & Lifecycle
 
-The two state machines and the invariants that govern the whole firmware.
+The current branch has one implemented lifecycle: the safety core's disarmed
+and armed states, plus the protocol's sequence counter.
 
 ---
 
-## 1. Scan lifecycle (`lib/SonarScan`)
-
-Four implicit states: idle, swept toward 180, swept toward 0, plus settle
-timing at every angle. Implemented as `scanning_`, `forward_`, `currentAngle_`,
-`stage_` (`IDLE`/`SETTLE`).
+## 1. Safety-core lifecycle
 
 ```mermaid
 stateDiagram-v2
-    [*] --> IDLE : boot (stopped, never self-starts)
+    [*] --> DISARMED : boot
 
-    IDLE --> SWEEP_UP : start()
-    SWEEP_UP --> SETTLE : at angle (wait 300ms)
-    SWEEP_UP --> SWEEP_DOWN : reach 180 (publish scan)
-    SWEEP_DOWN --> SETTLE : at angle (wait 300ms)
-    SWEEP_DOWN --> SWEEP_UP : reach 0 (publish scan)
-
-    state SETTLE {
-        [*] --> settle
-        settle --> measure : time elapsed
-        measure --> [*] : both sensors fired
-    }
-
-    SWEEP_UP --> IDLE : stop()
-    SWEEP_DOWN --> IDLE : stop()
-    SETTLE --> IDLE : stop()
+    DISARMED --> ARMED : arm request accepted
+    ARMED --> ARMED : further control intents
 ```
 
-Details:
+The arming-expiry transition is implemented by issue #9. The E-stop, stale-link
+and latched-stop transitions are implemented by their own tickets.
 
-* **tick()** returns `true` exactly once per completed 0→180 (or 180→0) sweep,
-  filling `ScanData` — that is one full 360° scan (bearing set built from both
-  sensors, sorted by bearing in `ScanBuilder::finish`).
-* The turnaround angle belongs to both half-sweeps (i.e. both 0 and 180 appear
-  in back-to-back scans; `ScanBuilder` is reset each time).
-* Sensors fire **sequentially** (sensor 1 then sensor 2) at every angle to avoid
-  crosstalk, after the settle delay lets the servo stop vibrating.
-* `start()` while already scanning is a no-op; the servo does not move on
-  `stop()` (holds current angle).
+### Disarmed
+
+The car:
+
+* reports `armed: false`;
+* forces the requested throttle to zero;
+* keeps the motor coasting;
+* returns the steering angle to straight;
+* ramps the actual throttle to zero rather than jumping.
+
+### Armed
+
+The car:
+
+* applies the requested throttle and steering angle;
+* reports both the requested and actual throttle;
+* ramps the actual throttle toward the requested throttle at a bounded rate;
+* keeps the motor coasting when the requested throttle is zero.
 
 ---
 
-## 2. Connection lifecycle (`lib/MqttTransport`)
+## 2. Throttle ramp
 
-Wi-Fi and MQTT are tracked separately (the display shows each). Reconnect
-attempts are throttled to every 2 s.
+The actual throttle covers the full `-100` … `+100` range in 300 ms. The core
+uses injected time, so host tests never wait.
+
+When the requested throttle changes sign, the actual throttle reaches exactly
+zero before it becomes negative (or positive). This gives the later motor
+adapter a safe point at which to coast before changing direction.
+
+---
+
+## 3. Request-sequence lifecycle
 
 ```mermaid
 stateDiagram-v2
-    [*] --> WIFI_OFF : begin() -> WiFi.begin()
-
-    WIFI_OFF --> WIFI_UP : status() == WL_CONNECTED
-    WIFI_UP --> WIFI_OFF : link lost
-    WIFI_OFF --> WIFI_OFF : retry (2 s throttle)
-
-    WIFI_UP --> MQTT_OFF : connected() == false
-    MQTT_OFF --> MQTT_UP : mqtt.connect() ok
-    MQTT_UP --> MQTT_OFF : disconnect
-    MQTT_OFF --> MQTT_OFF : retry (2 s throttle)
-
-    MQTT_UP --> [*] : (never leaves by itself)
+    [*] --> NO_SEQUENCE : server starts
+    NO_SEQUENCE --> LAST_ACCEPTED : first valid intent accepted
+    LAST_ACCEPTED --> LAST_ACCEPTED : greater sequence accepted
+    LAST_ACCEPTED --> LAST_ACCEPTED : stale/replayed intent dropped
 ```
 
-* `connected()` = WIFI_UP **and** MQTT_UP. Publish helpers refuse to send
-  otherwise.
-* On the broker side: while offline the car neither scans nor publishes
-  (enforced in `loop()`, see data-flows §4).
+Only a valid, authenticated intent advances the sequence counter. Invalid and
+stale requests leave both the car and the counter unchanged.
 
 ---
 
-## 3. Lifecycle invariants (never break)
+## 4. Lifecycle invariants
 
-From `AGENTS.md` §7, mapped to where they hold in code:
-
-| # | Invariant | Enforced at |
-| - | --------- | ----------- |
-| 1 | Stop on command timeout (~500 ms) | Phase 2 feature — not yet implemented; `loop()` only scans while connected |
-| 2 | Default on boot: **stopped** | `SonarScan::scanning_ = false` at construction; nothing calls `start()` in `setup()` |
-| 3 | Wi-Fi/MQTT reconnect while stopped; never drive without live link | `loop()` gates `scanner.tick()` behind `mqtt.connected()` and calls `scanner.stop()` on link loss |
-| 4 | Never bypass the E-stop path (software or physical) | Physical E-stop wiring is Phase 1; software `ESTOP` exists in the protocol but the handler is Phase 2 |
-
-These are the unshakeable rails — any refactor must keep them.
-
----
-
-## 4. Display lifecycle (`lib/StatusDisplay`)
-
-Simple timer-driven rotation, no state machine of its own:
-
-* `begin()` renders page 0 immediately.
-* `tick(nowMs, state)` renders the *current* page on first call, then advances
-  `currentPage = (currentPage + 1) % 3` every `kRotateIntervalMs` (3000 ms).
-* Rendering is idempotent: `printLine()` rewrites the row in place, so no
-  diffing bothers — the panel just gets overwritten on every page change. Pages
-  adapt to the display size (compact 2-line vs. fuller multi-line).
+| Invariant | Enforced at |
+| --------- | ----------- |
+| The car boots stopped and disarmed | `CarControl`'s initial state; no hardware output exists before the motor adapter ticket |
+| A disarmed car refuses throttle | `CarControl::update()` |
+| The actual throttle never jumps | `CarControl::update()` |
+| A rejected request changes no state | `ControlProtocol::handleControl()` before `CarControl::update()` |
+| The phone cannot bypass token authentication | `ControlProtocol` and the HTTP adapter |
+| The safety core performs no I/O | `lib/CarControl` includes no Arduino or transport headers |

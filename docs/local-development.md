@@ -1,173 +1,104 @@
-# Local Development & Testing
+# Local Development
 
-Setup guide for running the PC-side tools and talking to the car on your own
-machine. This is the setup used for everyday local development/testing.
+## Prerequisites
 
-## 1. MQTT broker on the PC
+* PlatformIO (the repository expects `~/.platformio/penv/bin/pio`)
+* an ESP32 DevKit V1 for firmware work
+* a phone or `curl` for the HTTP interface
 
-The broker runs on the PC; the ESP32 and the PC tools connect to it over
-Wi-Fi. Mosquitto is the reference broker (`docs/decisions.md`, Decided #12).
+There is no MQTT broker, Python environment or PC-side application on this
+branch.
 
-### 1.1 Install
+---
 
-```bash
-sudo apt install mosquitto mosquitto-clients
-```
+## Configure the firmware
 
-`mosquitto-clients` provides `mosquitto_sub` / `mosquitto_pub` for quick tests.
-
-### 1.2 Listen on the LAN
-
-By default Mosquitto listens **only on loopback** (`127.0.0.1`), which the ESP32
-cannot reach over Wi-Fi. A missing `listener` directive shows up on the car's
-serial monitor as:
-
-```
-[net] MQTT connect failed (rc=-2), retrying
-WiFiClient: connect(): socket error, errno: 104, "Connection reset by peer"
-```
-
-To serve the LAN, add a listener that binds all interfaces:
-
-```bash
-sudo tee /etc/mosquitto/conf.d/lan.conf <<'EOF'
-listener 1883 0.0.0.0
-allow_anonymous true
-EOF
-sudo systemctl restart mosquitto
-```
-
-> **Security note:** binding `0.0.0.0` exposes the broker to the whole network
-> with no authentication (`allow_anonymous true`). Acceptable for a small indoor
-> test environment; revisit before any other network use.
-
-### 1.3 Verify
-
-```bash
-ss -tlnp | grep 1883
-```
-
-Expected output shows `0.0.0.0:1883` (not just `127.0.0.1:1883`).
-
-Test from the PC against the machine's own LAN IP (from `ip -4 addr show`,
-e.g. `10.220.0.18`):
-
-```bash
-mosquitto_sub -h 10.220.0.18 -t 'car/scan' -v        # terminal 1
-mosquitto_pub -h 10.220.0.18 -t car/scan -m '{}'     # terminal 2 -> you see it arrive
-```
-
-## 2. Python tooling
-
-The PC tools live in `tools/` (`sonar_viewer.py`, `mock_scan_publisher.py`).
-
-```bash
-cd tools
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
-
-`tools/venv` is gitignored; recreate it on a fresh clone.
-
-On Linux, PyQt6 (used by the viewer) also needs a system package that provides
-the Qt `xcb` platform plugin support:
-
-```bash
-sudo apt install libxcb-cursor0
-```
-
-## 3. Firmware config
-
-Wi-Fi and broker settings live in `include/config.h` (gitignored). Create it
-from the template and fill in your values:
+`include/config.h` is gitignored. Create it from the committed template:
 
 ```bash
 cp include/config.example.h include/config.h
 ```
 
-Required fields: `WIFI_SSID`, `WIFI_PASSWORD`, `MQTT_BROKER_HOST` (the PC's LAN
-IP, e.g. `10.220.0.18`), `MQTT_BROKER_PORT` (default `1883`).
+Set at least:
 
-## 4. End-to-end check
+* `WIFI_SSID`
+* `WIFI_PASSWORD`
+* `CAR_HOSTNAME`
+* `CONTROL_TOKEN` — a long random shared secret
 
-> The car stays **stopped at boot until commanded** (safety). Publishing or
-> viewing scans never moves the car — you must send `START_SCAN` to `car/cmd`.
+Every HTTP request must send that token in the `X-Control-Token` header. If
+`CONTROL_TOKEN` is empty, the endpoint rejects every request.
 
-### 4.1 Without hardware (mock publisher)
+---
 
-Only exercises the PC → broker → viewer path. The mock publishes fake `car/scan`
-messages and **does not** talk to the car.
-
-```bash
-# terminal 1: broker already running (section 1)
-# terminal 2: fake scan source
-cd tools && source venv/bin/activate
-python mock_scan_publisher.py --broker 10.220.0.18
-
-# terminal 3: viewer
-cd tools && source venv/bin/activate
-python sonar_viewer.py --broker 10.220.0.18
-```
-
-### 4.2 With the car
-
-The viewer can command the car: press `S` (start scan), `X` (stop scan),
-`P` (ping) in the viewer window, or pass `--auto-start` to send `START_SCAN` on
-connect. Stop the mock publisher first so you see only real scans.
+## Build and test
 
 ```bash
-~/.platformio/penv/bin/pio run -t upload     # flash firmware
-~/.platformio/penv/bin/pio monitor           # serial monitor, expect [net] logs
+~/.platformio/penv/bin/pio run
+~/.platformio/penv/bin/pio test -e native --without-uploading
 ```
 
-Start scanning — either press `S` in the viewer, or from the terminal:
+Run one native suite while working on it:
 
 ```bash
-mosquitto_pub -h 10.220.0.18 -t car/cmd -m '{"command":"START_SCAN"}'
+~/.platformio/penv/bin/pio test -e native --without-uploading \
+  --filter test_car_control
 ```
 
-The car publishes one complete 360 degree scan to `car/scan` per half-sweep;
-`STOP_SCAN` halts it. Serial log confirms each publish:
+The firmware build and the complete host suite are both required before a
+change is complete.
 
-```
-[net] MQTT connected, subscribed to car/cmd
-command received: START_SCAN
-scan 1234 published (26 points)
-```
+---
 
-If the servo does not sweep, the command never arrived — check the serial log
-for `command received: START_SCAN` (it only prints if the ESP32 parsed it).
-
-## 4.3 Wireless firmware updates (OTA)
-
-The first flash must be over USB; afterwards the car can be flashed over Wi-Fi
-via PlatformIO's built-in `espota` uploader (no extra tooling — it detects the
-IP and switches automatically).
+## Flash and monitor
 
 ```bash
-# once: USB
 ~/.platformio/penv/bin/pio run -t upload
-
-# afterwards: wireless, using the car's IP (serial "[net] Wi-Fi connected" line)
-~/.platformio/penv/bin/pio run -t upload --upload-port 192.168.x.y
+~/.platformio/penv/bin/pio monitor
 ```
 
-The scan/servo stops automatically when an update starts, and the car reboots
-into the new image (MQTT reconnects as usual). A bad image rolls back
-automatically; USB re-flash always remains available.
+The serial monitor runs at 115200 baud. The current firmware joins the
+configured Wi-Fi network and starts the HTTP server. The access-point fallback
+and wireless update wiring are later tickets.
 
-## 5. Troubleshooting
+---
 
-| Symptom | Cause / fix |
-| ------- | ----------- |
-| `[net] MQTT connect failed (rc=-2)` + `errno 104` | Broker not listening on the LAN IP. Check `ss -tlnp | grep 1883`; apply section 1.2. |
-| No `[net]` logs at all after boot line | `include/config.h` not created or wrong credentials; the log `connecting to Wi-Fi "..."` shows the configured SSID. |
-| `[net] Wi-Fi lost, reconnecting...` on a loop | Wrong SSID/password, or AP out of range. |
-| Viewer shows nothing | Broker IP wrong for the client, or scans not started (`START_SCAN`). Use `mosquitto_sub -h <broker> -t 'car/scan' -v` to confirm messages flow. |
-| Car connects but servo never sweeps | No `START_SCAN` reached the car (it is stopped until commanded). The viewer sends it via `S`/`--auto-start`; `car/scan` traffic never moves the car. Serial shows `command received: START_SCAN` only if the ESP32 parsed it. |
-| `[net] scan publish FAILED` right before `scan ... published` | Scan JSON (~1.7 kB) exceeds PubSubClient's default 256-byte buffer. Firmware sets `MQTT_MAX_PACKET_SIZE=2048` in `platformio.ini`; reflash. |
-| Viewer crashes with `qt.qpa.plugin ... xcb-cursor0 is needed` | Qt6 needs `libxcb-cursor0` on Linux: `sudo apt install libxcb-cursor0`. |
-| `pio test` runs no tests | Use the native env: `~/.platformio/penv/bin/pio test -e native --without-uploading`. |
-| OTA upload fails / times out | Wrong IP, or the car on a different subnet; or the running image predates OTA support — re-flash over USB once, then retry. |
-| Boot loop: `assert failed: tcpip_send_msg_wait_sem ... (Invalid mbox)` + backtrace through `ArduinoOTAClass::begin` | The OTA client was started before Wi-Fi/lwip was up. Fixed in firmware (`ota.begin()` is now deferred until the first Wi-Fi connect); re-flash via USB. |
+## Exercise the HTTP interface
+
+Set the token in the shell without committing it:
+
+```bash
+export CONTROL_TOKEN='the-value-from-include/config.h'
+```
+
+Read the state:
+
+```bash
+curl -H "X-Control-Token: $CONTROL_TOKEN" http://CAR_IP/api/state
+```
+
+Post a control intent:
+
+```bash
+curl -X POST \
+  -H "X-Control-Token: $CONTROL_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"t":40,"s":0,"arm":true,"latch":false,"seq":1}' \
+  http://CAR_IP/api/control
+```
+
+The sequence counter must increase on every accepted request. A stale or
+replayed counter returns HTTP 409.
+
+The current firmware does not yet have the motor adapter or the phone page,
+so an accepted intent changes the reported state but does not move the car.
+Issue #7 adds both.
+
+---
+
+## Safety during development
+
+* Keep the wheels off the ground.
+* The obstacle interlock and physical E-stop are not implemented yet.
+* Never bypass the E-stop path.
+* Do not commit `include/config.h`, credentials or the shared token.

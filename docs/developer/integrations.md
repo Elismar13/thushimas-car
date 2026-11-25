@@ -1,125 +1,81 @@
 # Developer Guide — Integrations
 
-All external touch points in one place: MQTT topics, GPIO pins, config header,
-build environment, and PC tools. Where there are two sources of truth (e.g.
-pins in code **and** in `docs/hardware.md`), keep them in sync.
+Every external touch point in the current branch.
 
 ---
 
-## 1. MQTT
+## 1. HTTP control interface
 
-Broker on the PC (Mosquitto), Wi-Fi + MQTT. Schema in `docs/communication.md`.
+| Method | Path | Direction | Purpose |
+| ------ | ---- | --------- | ------- |
+| `POST` | `/api/control` | Phone → ESP32 | Post a control intent; receive the state snapshot. |
+| `GET` | `/api/state` | Phone → ESP32 | Read the current state snapshot. |
 
-| Topic | Direction | QoS | Producer | Consumer | Status |
-| ----- | --------- | --- | -------- | -------- | ------ |
-| `car/cmd` | PC → ESP32 | 1 | `sonar_viewer.py`, `mosquitto_pub` | `MqttTransport` callback → `handleCommand()` | **Implemented** (START_SCAN / STOP_SCAN / PING) |
-| `car/scan` | ESP32 → PC | 0 | `main.cpp publishScan()` | `sonar_viewer.py`, `mock_scan_publisher.py` test subscriber | **Implemented** |
-| `car/status` | ESP32 → PC | 0 | `main.cpp publishStatus()` (after commands) | — (no PC consumer yet) | Implemented, unused |
-| `car/telemetry` | ESP32 → PC | 0 | — | — | Documented (`communication.md` §4), **not implemented** |
+Both requests carry `X-Control-Token`. The request and response schemas are in
+[`docs/communication.md`](../communication.md).
 
-Command set in firmware today: `START_SCAN`, `STOP_SCAN`, `STEER {angle}`,
-`PING`. `THROTTLE`, `STOP`, `ESTOP`, `RESET_ESTOP`, `SET_SPEED_LIMIT` are in
-the protocol but dispatch is Phase 2.
+The HTTP server is implemented by `lib/HttpApi`; validation and safety are
+implemented behind `ControlEndpoint` in `lib/ControlProtocol`.
 
-**Constants:** broker host/port/clientId → `include/config.h`; topics →
-`src/main.cpp` (`kCmdTopic`, `kScanTopic`, `kStatusTopic`).
-
-**Publish size limit:** PubSubClient is compiled with
-`MQTT_MAX_PACKET_SIZE=2048` (a full scan is ~1.7 kB; the default 256 B silently
-drops publishes — this was a real bug, see `git log a916730`).
+The current firmware joins the configured Wi-Fi network in station mode. The
+access-point fallback and the phone page are later control-surface work.
 
 ---
 
-## 2. GPIO map (firmware ↔ hardware doc)
+## 2. GPIO map
 
-This table tracks the **branch** pin map (`docs/hardware.md` §3, DECIDED #71).
-The rest of this file still describes the `main`-line implementation and is
-rewritten under issue #18.
+This table tracks the branch pin map in [`docs/hardware.md`](../hardware.md) §3.
 
-| Function | GPIO | Code constant | Accuracy |
-| -------- | ---- | ------------- | -------- |
-| Motor driver `INA` / `INB` | 32 / 33 | — (control surface, issue #7) | matches `hardware.md` §3 |
-| Steering servo | 16 | `kSteerServoPin` (range `[40, 140]`) | matches `hardware.md` §3 |
-| Ultrasonic `TRIG` | 25 | `kTrigPin` | matches |
-| Ultrasonic `ECHO` | 26 | `kEchoPin` | matches (5 V → divider!) |
-| E-stop button | 4 | — (issue #13) | matches (DECIDED #76) |
-| Battery divider tap | 35 | — (issue #15) | matches (ADC1_CH7, DECIDED #72) |
-| Sensor-head servo | 17 | — | removed on this branch (DECIDED #45) |
-| Ultrasonic 2 `TRIG` / `ECHO` | 32 / 33 | — | removed; the pins are reused by the motor driver (DECIDED #45, #71) |
-| I2C SDA / SCL | 21 / 22 | — | removed with the OLED (DECIDED #44) |
+| Function | GPIO | Current code | Status |
+| -------- | ---- | ------------ | ------ |
+| Motor driver `INA` | 32 | — | issue #7 |
+| Motor driver `INB` | 33 | — | issue #7 |
+| Steering servo | 16 | — | issue #7/#8 |
+| Ultrasonic `TRIG` | 25 | — | issue #11 |
+| Ultrasonic `ECHO` | 26 | — | issue #11; 5 V divider mandatory |
+| E-stop button | 4 | — | issue #13; `INPUT_PULLUP`, active low |
+| Battery divider tap | 35 | — | issue #15; ADC1_CH7 |
 
-> Never assign a pin already in use; consult `docs/hardware.md` §3 constraints
-> (flash pins 6–11, strapping pins, input-only 34–39).
+The sensor-head servo, second ultrasonic and OLED pins are free on this
+branch.
+
+> Never assign a pin already in use. GPIO 6–11 are flash pins; GPIO 0, 2, 5,
+> 12 and 15 are strapping pins; GPIO 34–39 have no internal pull-up.
 
 ---
 
-## 3. Config header (`include/config.h`)
+## 3. Config header
 
-Gitignored; template `include/config.example.h`. Read at compile time by
-`MqttTransport` construction in `src/main.cpp`.
+`include/config.h` is gitignored. `include/config.example.h` is the committed
+template.
 
 | Macro | Meaning |
 | ----- | ------- |
-| `WIFI_SSID` / `WIFI_PASSWORD` | network credentials |
-| `MQTT_BROKER_HOST` | PC LAN IP (e.g. `10.220.0.18`) |
-| `MQTT_BROKER_PORT` | default `1883` |
-| `MQTT_CLIENT_ID` | broker-visible client id |
+| `WIFI_SSID` / `WIFI_PASSWORD` | station-mode network credentials |
+| `CAR_HOSTNAME` | the car's network name |
+| `CONTROL_TOKEN` | shared token for every HTTP request |
+
+No MQTT broker setting belongs on this branch.
 
 ---
 
-## 4. Build environment (`platformio.ini`)
+## 4. Build environments
 
 | Section | Purpose |
 | ------- | ------- |
-| `[platformio] default_envs = esp32dev` | `pio run` builds firmware only |
-| `[env:esp32dev]` | espressif32/esp32dev + arduino; `-DMQTT_MAX_PACKET_SIZE=2048` |
-| `[env:native]` | host tests; `build_src_filter = -<*>` + `lib_ignore` |
+| `[platformio] default_envs = esp32dev` | firmware is built by default |
+| `[env:esp32dev]` | ESP32 DevKit + Arduino framework |
+| `[env:native]` | host tests; no `src/main.cpp`; hardware libraries ignored |
 
-`lib_deps` (external libraries — never vendored into `lib/`):
+External dependencies:
 
 | Library | Used by | Purpose |
 | ------- | ------- | ------- |
-| `teckel12/NewPing` | `lib/Ultrasonic` | HC-SR04 ping |
-| `madhephaestus/ESP32Servo` | `lib/ServoControl` | 50 Hz servo PWM |
-| `knolleary/PubSubClient` | `lib/MqttTransport` | MQTT client |
-| `bblanchon/ArduinoJson` | `src/main.cpp` | scan/status/command JSON |
-| `adafruit/Adafruit SSD1306` + `adafruit/Adafruit GFX Library` | `lib/Ssd1306Display` | 128x64 I2C OLED |
-| `ArduinoOTA` (framework lib) | `lib/OtaService` | wireless flash over UDP 3232 |
+| `bblanchon/ArduinoJson` | `lib/ControlProtocol` | control-intent parsing and state serialization |
+| `teckel12/NewPing` | `lib/Ultrasonic` | HC-SR04 reading |
+| `madhephaestus/ESP32Servo` | `lib/ServoControl` | servo PWM |
+| Arduino WebServer framework | `lib/HttpApi` | HTTP socket handling |
+| `ArduinoOTA` framework | `lib/OtaService` | wireless update |
 
-`lib_ignore` in the native env excludes hardware libs so tests link only pure
-code: `ServoControl, Ultrasonic, MqttTransport, SonarScan, Ssd1306Display,
-OtaService`.
-
-**Ports:** MQTT (TCP 1883) and OTA (UDP 3232, ArduinoOTA) coexist on the same
-Wi-Fi link without conflict.
-
----
-
-## 5. PC tooling (`tools/`)
-
-Dependencies (`requirements.txt`): `paho-mqtt`, `numpy`, `pyqtgraph`.
-
-| Tool | Broker needed | Purpose | Talks to car |
-| ---- | ------------- | ------- | ------------ |
-| `sonar_viewer.py` | yes | view scans live; send start/stop/ping | yes (commands) |
-| `mock_scan_publisher.py` | yes | fake scan source (no hardware) | **no** |
-
-PyQt6 on Linux needs system package `libxcb-cursor0`; broker LAN setup needs a
-Mosquitto `listener 1883 0.0.0.0` + `allow_anonymous true` on the PC — see
-`docs/local-development.md`.
-
----
-
-## 6. Cross-cutting matrix
-
-| Concern | Pure (host-testable) | Hardware/ESP32 | PC-side |
-| ------- | -------------------- | -------------- | ------- |
-| Scan data model, nearest obstacle | `lib/ScanData` | — | — |
-| Head sweep timing/measurement | — | `lib/SonarScan` (+`ServoControl`, `Ultrasonic`) | — |
-| MQTT/Wi-Fi | — | `lib/MqttTransport` | broker + tools |
-| Display rendering | `lib/StatusDisplay` (+`TextDisplay`) | `lib/Ssd1306Display` | — |
-| JSON schema | (mirrored in docs) | `src/main.cpp` ArduinoJson | `tools/*.py` json |
-
-**Rule of thumb:** keep units mm/degrees; keep `ScanData`-style logic pure so it
-can be unit-tested on the host; keep `platformio.ini`, `docs/hardware.md`, and
-`src/main.cpp` pin/flag constants in agreement.
+The native environment ignores `ServoControl`, `Ultrasonic`, `OtaService` and
+`HttpApi`, because those modules touch ESP32 or Arduino APIs.

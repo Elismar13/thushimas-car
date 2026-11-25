@@ -27,7 +27,7 @@ steering angle (degrees). Kinematics: `R = L / tan(δ)`.
 | ---- | ----------------- |
 | `docs/architecture.md` | System layers, robot state, kinematic model, data flow |
 | `docs/hardware.md` | BOM, the branch's GPIO pin map (§3), power architecture, wiring |
-| `docs/communication.md` | MQTT topics, JSON command/telemetry schemas, safety behavior |
+| `docs/communication.md` | HTTP control endpoint, token authentication, JSON schemas, safety behavior |
 | `docs/roadmap.md` | Phase definitions and Definitions of Done (DoD) |
 | `docs/safety-matrix.md` | The safety rules as a matrix — one row per situation, one test per row |
 | `docs/decisions.md` | `DECIDED` choices vs open `TBD` items + change policy |
@@ -77,7 +77,7 @@ PlatformIO is available at `~/.platformio/penv/bin/pio` (not on PATH by default)
 ```
 
 * Always run `pio run` after changing firmware code — the task is not done until it compiles.
-* `pio test` currently errors because `test/` is empty; add real tests before running it.
+* Run the full native suite before completion; the safety core and protocol have host tests.
 * `platformio.ini` must remain parseable — the file is strict INI. A broken comment/section
   header will fail every build (this happened once already).
 
@@ -91,20 +91,24 @@ PlatformIO is available at `~/.platformio/penv/bin/pio` (not on PATH by default)
 * Prefer mature external libraries for complex peripherals; simple peripherals may use
   thin hand-rolled drivers. Keep stable units (mm, degrees) in `lib/` wrappers — the rest
   of the code never includes the library headers directly. External deps:
-  `teckel12/NewPing` (HC-SR04) and `madhephaestus/ESP32Servo` (servos).
+  `teckel12/NewPing` (HC-SR04), `madhephaestus/ESP32Servo` (servos), and
+  `bblanchon/ArduinoJson` (confined to `lib/ControlProtocol`).
 * Add new libraries via `lib_deps` in `platformio.ini`; never vendor library code into `lib/`.
 * Respect the pin map in `docs/hardware.md` (§3). Never assign a pin already in use.
 * HC-SR04 ECHO is 5 V; level-shift (resistor divider) — do not feed 5 V into a GPIO.
-* Servos: 50 Hz PWM (~1–2 ms pulse). L298N: set IN1/IN2 before enabling ENA.
-* Fire the two ultrasonic sensors **sequentially**, never simultaneously.
+* Servos: 50 Hz PWM (~1–2 ms pulse). The TC1508A has no enable pin; use its
+  `INA`/`INB` truth table and pass through standby before changing direction.
+* The branch has one fixed frontal ultrasonic sensor; it is not fired
+  simultaneously with another sensor.
 * Put shared/unit-testable logic in `lib/`; keep `src/main.cpp` as wiring/glue.
-* No trailing secrets: Wi-Fi credentials and MQTT broker config belong in a config header
-  that is gitignored or clearly marked, never hard-coded into committed code.
+* No trailing secrets: Wi-Fi credentials and `CONTROL_TOKEN` belong in a config
+  header that is gitignored or clearly marked, never hard-coded into committed code.
 
-### PC side (Python)
+### Phone-facing protocol
 
-* Phase 5+ tooling: `paho-mqtt`, `numpy`, `matplotlib`/`PyQtGraph`.
-* Keep protocol payloads exactly matching `docs/communication.md` schemas.
+* Keep request and response payloads exactly matching `docs/communication.md`.
+* Transport adapters implement `ControlEndpoint`; safety rules stay in
+  `lib/CarControl` and do not depend on HTTP.
 
 ### General
 
@@ -116,14 +120,16 @@ PlatformIO is available at `~/.platformio/penv/bin/pio` (not on PATH by default)
 
 ## 7. Safety invariants (never break these)
 
-1. Safety must not depend on the PC. The ESP32 stops itself on:
-   * command timeout (~500 ms),
-   * physical E-stop button (active-low, INPUT_PULLUP),
-   * latched `ESTOP` command until `RESET_ESTOP`,
-   * obstacle below the threshold.
-2. Default on boot: **stopped**. Never start moving on power-up.
-3. Wi-Fi/MQTT reconnect while stopped; the car never drives without a live link.
-4. Never remove or bypass the E-stop path, software or physical, in any phase.
+1. Safety must not depend on the phone. The ESP32 stops itself on:
+   * a stale car link,
+   * the physical E-stop button (active-low, `INPUT_PULLUP`),
+   * a latched stop until it is explicitly cleared,
+   * an obstacle within the stop threshold.
+2. Default on boot: **stopped and disarmed**. Never start moving on power-up.
+3. Wi-Fi reconnects while stopped; the car never drives without a live car
+   link.
+4. The actual throttle always ramps at a bounded rate and never jumps.
+5. Never remove or bypass the E-stop path, software or physical, in any phase.
 
 ---
 
@@ -156,10 +162,9 @@ intact.
 
 * `docs/decisions.md` opens with a **Branch Overrides** table. It lists which
   `main`-line decisions this branch replaces and which carry forward unchanged.
-  **Build for the replacements.** Sections 4, 6 and 7 of this file still describe the
-  `main`-line architecture (MQTT, the L298N, two ultrasonic sensors) — treat the
-  Branch Overrides table as authoritative wherever the two disagree, until the doc
-  surgery lands.
+  **Build for the replacements.** The branch uses HTTP, a TC1508A and one
+  frontal ultrasonic sensor; the current implementation and its seams are in
+  `docs/architecture.md` and `docs/developer/`.
 * Read `CONTEXT.md` (the glossary) before writing code, tests, issues or docs. Use
   its vocabulary; do not drift to the synonyms it lists under `_Avoid_`.
 * Read `docs/adr/0001-pivot-to-phone-controlled-car.md` for the rationale.

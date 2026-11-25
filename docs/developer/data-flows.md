@@ -1,190 +1,126 @@
 # Developer Guide — Data Flows
 
-End-to-end flows through the system. All flows start from `loop()` in
-`src/main.cpp`; MQTT endpoints are defined in `docs/communication.md`.
+The current branch has one phone-facing flow: an HTTP control intent enters
+the protocol module, the safety core decides what the car may do, and the
+state snapshot returns over the same request.
 
 ---
 
-## 1. Boot and connect
+## 1. Boot
 
 ```mermaid
 sequenceDiagram
-    participant P as src/main.cpp
-    participant S as SonarScan
-    participant M as MqttTransport
-    participant W as WiFi (ESP32)
-    participant O as OtaService
-    participant B as Broker (PC)
+    participant M as src/main.cpp
+    participant W as Wi-Fi
+    participant H as HttpApi
+    participant P as ControlProtocol
+    participant C as CarControl
 
-    P->>S: setup(): begin() + setStepDegrees(15) + setSettleMs(300)
-    P->>M: begin() (set SSID/pwd, broker, cmdTopic, callback)
-    M->>W: WiFi.begin(ssid, password)  [STA mode]
-    Note over M,W: loop() drives reconnects at 2 s intervals
+    M->>C: construct (boot state: disarmed)
+    M->>W: WiFi.begin(WIFI_SSID, WIFI_PASSWORD)
+    M->>H: begin()
+    H->>H: register POST /api/control and GET /api/state
+    H->>H: server.begin()
     loop every loop()
-        M->>W: WiFi.status()?
-        W-->>M: WL_CONNECTED
-        alt first connection
-            P->>O: ota.begin() (once Wi-Fi/lwip is up; UDP 3232)
-            Note over O: ArduinoOTA binds its UDP socket here, never before
-        end
-        M->>B: mqtt.connect(clientId)
-        M->>B: subscribe(car/cmd)
-        M-->>P: connected() == true
-    end
-    Note over P,S: Car is STILL STOPPED: scanner not started, no scanning
-```
-
-Boot invariant: after setup, the car neither scans nor moves until a command
-arrives on `car/cmd`.
-
----
-
-## 2. START_SCAN command → servo sweep → scan publish
-
-The two opposed HC-SR04s make every 0→180 half-sweep a complete 360° scan that
-is published as one `car/scan` message.
-
-```mermaid
-sequenceDiagram
-    participant V as sonar_viewer.py (or mosquitto_pub)
-    participant B as Broker
-    participant M as MqttTransport
-    participant C as main.cpp handleCommand()
-    participant S as SonarScan
-    participant H as head servo + 2x HC-SR04
-    participant P as main.cpp publishScan()
-
-    V->>B: PUB car/cmd {"type":"command","command":"START_SCAN"} (QoS 1)
-    B->>M: SUB car/cmd callback
-    M->>C: handleCommand(topic, payload, len)
-    C->>S: scanner.start()
-    Note over S: begin wiper: moveTo(0), SETTLE
-    C-->>P: publishStatus() -> car/status
-
-    loop every settleMs (300) per angle
-        S->>H: servo.setAngle(currentAngle)
-        S->>H: us1.measureMm() then us2.measureMm() (sequential)
-        alt reach end of half-sweep (0→180 or 180→0)
-            S-->>C: tick() returns true, fill ScanData (26 pts)
-            C->>P: publishScan(scan)
-            P->>M: publishScan(json) -> car/scan (QoS 0)
-            B->>V: deliver scan (viewer renders polar + cartesian)
-        else
-            S->>H: moveTo(next angle)
-        end
+        M->>W: reconnect when disconnected
+        M->>H: loop()
+        H->>H: handleClient()
     end
 ```
 
-Timing note: step 15° × settle 300 ms → one half-sweep ≈ 3.6 s → a scan
-roughly every 3.6 s.
+The boot invariant is that the safety core is disarmed and its motor output
+is coast. No request is needed to reach a stopped state, and no request can
+make the car move before the motor adapter in issue #7 exists.
 
 ---
 
-## 3. STEER command
-
-Moves the front steering servo (pin 16, travel `[40°, 140°]`). The command
-angle is **relative to straight**: `0` = centered (servo 90°), `+50` =
-full-right hard stop (140°), `-50` = full-left hard stop (40°). Out-of-range
-angles are clamped by `ServoControl::setAngle()`.
+## 2. Accepted control intent
 
 ```mermaid
 sequenceDiagram
-    participant V as sonar_viewer.py (or mosquitto_pub)
-    participant B as Broker
-    participant M as MqttTransport
-    participant C as main.cpp handleCommand()
-    participant S as steerServo
-    participant P as main.cpp publishStatus()
+    participant P as Phone
+    participant H as HttpApi
+    participant E as ControlProtocol
+    participant C as CarControl
 
-    V->>B: PUB car/cmd {"command":"STEER","angle":30} (QoS 1)
-    B->>M: callback
-    M->>C: handleCommand(...)
-    C->>S: setAngle(90 + 30)  -> 120° (within [40,140])
-    S->>S: clamp to [40,140] if needed
-    C-->>B: publishStatus() -> car/status ({"steeringAngle":30})
+    P->>H: POST /api/control + X-Control-Token + JSON intent
+    H->>E: handleControl(token, payload, context)
+    E->>E: authenticate token
+    E->>E: parse and validate fields
+    E->>E: reject stale/replayed sequence
+    E->>C: update(intent, inputs, nowMs)
+    C->>C: apply rules and ramp actual throttle
+    C-->>E: motor output and state
+    E-->>H: accepted response + state snapshot
+    H-->>P: 200 application/json
 ```
 
----
-
-## 4. STOP_SCAN
-
-```mermaid
-sequenceDiagram
-    participant V as sonar_viewer.py
-    participant B as Broker
-    participant M as MqttTransport
-    participant C as main.cpp handleCommand()
-    participant S as SonarScan
-
-    V->>B: PUB car/cmd {"command":"STOP_SCAN"} (QoS 1)
-    B->>M: callback
-    M->>C: handleCommand(...)
-    C->>S: scanner.stop()
-    Note over S: stage = IDLE; servo stays where it was
-    C-->>B: publishStatus() -> car/status (scanning: false)
-```
+The HTTP adapter only moves bytes. Authentication, validation, sequence
+handling and safety rules all live behind `ControlEndpoint`.
 
 ---
 
-## 5. Link loss (safety path)
-
-The car must never scan or publish without a live link.
+## 3. Rejected control intent
 
 ```mermaid
 sequenceDiagram
-    participant M as MqttTransport
-    participant W as WiFi
-    participant L as main.cpp loop()
-    participant S as SonarScan
+    participant P as Phone
+    participant H as HttpApi
+    participant E as ControlProtocol
+    participant C as CarControl
 
-    Note over M,W: MQTT or Wi-Fi drops
-    M-->>L: connected() == false
-    alt scanner was scanning
-        L->>S: scanner.stop()  // remain idle while offline
-    else
-        Note over S: already idle, nothing to do
+    P->>H: POST /api/control
+    H->>E: handleControl(...)
+    alt missing or wrong token
+        E-->>H: unauthorized
+        H-->>P: 401
+    else malformed, missing, wrong type or out of range
+        E-->>H: invalid_request
+        H-->>P: 400
+    else stale or replayed sequence
+        E-->>H: stale_sequence
+        H-->>P: 409
     end
-    loop reconnect (every 2 s)
-        M->>W: Wi-Fi reconnect
-        M->>M: mqtt reconnect + subscribe(car/cmd)
-    end
-    Note over S: Re-armed only after a new START_SCAN command
+    Note over E,C: CarControl is not called
 ```
+
+A rejected request changes neither the car's state nor its last accepted
+sequence counter.
 
 ---
 
-## 6. Display path (every loop pass)
+## 4. Safety-core update
+
+```mermaid
+flowchart TD
+    A[Control intent + inputs + current time] --> B{Disarmed?}
+    B -- yes --> C[Force requested throttle to zero]
+    C --> D[Return steering to straight]
+    D --> E[Coast]
+    B -- no --> F[Apply requested throttle and steering]
+    F --> G[Ramp actual throttle toward requested]
+    G --> H{Requested throttle zero?}
+    H -- yes --> I[Coast]
+    H -- no --> J[Drive]
+```
+
+This is the scope implemented by issue #6: matrix rows S1 and S2 plus the
+throttle ramp. Later safety tickets add their rows inside the same module.
+
+---
+
+## 5. State request
 
 ```mermaid
 sequenceDiagram
-    participant L as main.cpp loop()
-    participant M as MqttTransport
-    participant S as SonarScan
-    participant D as StatusDisplay
-    participant X as Ssd1306Display (OLED)
+    participant P as Phone
+    participant H as HttpApi
+    participant E as ControlProtocol
 
-    L->>M: wifiConnected() / connected()
-    L->>S: scanning()
-    L->>L: scanCount, lastPointCount, lastNearest*
-    Note over L: build StatusDisplay::State
-    L->>D: display.tick(millis(), state)
-    alt rotation due (every 3000 ms) or first run
-        D->>X: printLine(row, text) for each row of the page
-    else
-        Note over X: nothing written (page unchanged)
-    end
+    P->>H: GET /api/state + X-Control-Token
+    H->>E: state(token, context)
+    E-->>H: current state snapshot
+    H-->>P: 200 application/json
 ```
 
-Display is passive: it only reads state, never publishes or moves anything.
-
----
-
-## 7. PC tool data roles
-
-| Tool | Publishes | Subscribes | Drives the car? |
-| ---- | --------- | ---------- | --------------- |
-| `sonar_viewer.py` | `car/cmd` (S/X/P keys, `--auto-start`) | `car/scan` | Yes — commands only, car still enforces safety |
-| `mock_scan_publisher.py` | `car/scan` (fake) | — | **No** — for GUI/schema tests only |
-
-When testing with the real car, run the viewer (possibly `--auto-start`) and
-stop the mock publisher so only real scans flow.
+The state request never calls the safety core and never changes the car.

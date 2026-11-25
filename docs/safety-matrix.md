@@ -5,11 +5,9 @@ every rule becomes at least one host test **before** it is coded. Writing the
 matrix first is what stops the safety core from being whatever the code
 happened to do.
 
-> **Agreement gate.** This document and the branch roadmap
-> ([`docs/roadmap.md`](roadmap.md)) must be agreed by the maintainer before the
-> safety core (#6) is written. Until then, the matrix is a proposal: the
-> precedence order in §3 and the steering rule in §4 are recorded as proposals
-> #78 and #79 in `docs/decisions.md`, not as decisions.
+> **Agreed — 2026-11-25.** The maintainer accepted this matrix and the branch
+> roadmap ([`docs/roadmap.md`](roadmap.md)). The precedence order in §3 and the
+> steering rule in §4 are decisions #78 and #79 in `docs/decisions.md`.
 
 Units are fixed: distances in **millimetres**, angles in **degrees**, the
 requested throttle from **-100** (full reverse) to **+100** (full forward).
@@ -188,12 +186,11 @@ the whole discharge curve in #15.
 
 ## 8. Agreement
 
-The maintainer agrees this matrix by confirming that:
+The maintainer agreed this matrix on **2026-11-25** after confirming that:
 
 * every row's outcome is the behaviour they expect;
 * the precedence order in §3 is the order they expect;
 * the statements in §6 hold.
 
-Until they do, the safety core is not written. The matrix may then be amended
-by adding a row, never by rewriting history — see the change policy in
-`docs/decisions.md`.
+The matrix may be amended by adding a row, never by rewriting history — see the
+change policy in `docs/decisions.md`.

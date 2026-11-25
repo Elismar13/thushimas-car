@@ -1,43 +1,42 @@
 # Developer Guide — Index
 
-Reference documentation for the **current implementation**. This is the map
-that connects the project docs (`architecture.md`, `communication.md`,
-`hardware.md`, `roadmap.md`, `decisions.md`) to the actual code.
+Reference documentation for the current `feat/phone-controlled-car`
+implementation.
 
 | Document | What it answers |
 | -------- | --------------- |
-| [modules.md](modules.md) | What each component does, its public API, dependencies, and how they relate. |
-| [data-flows.md](data-flows.md) | End-to-end message/control flows: boot, scanning, publishing, offline handling, display. |
-| [state-and-lifecycle.md](state-and-lifecycle.md) | The state machines and lifecycle invariants (sweep state, connection state, safety rules). |
-| [integrations.md](integrations.md) | Every external touch point: MQTT topics, GPIO pins, config header, build envs, PC tools. |
-| [build-and-test.md](build-and-test.md) | PlatformIO environments, what the unit tests cover, commands. |
+| [modules.md](modules.md) | What each module does and what its public interface is. |
+| [data-flows.md](data-flows.md) | How a phone request reaches the safety core and returns. |
+| [state-and-lifecycle.md](state-and-lifecycle.md) | The implemented safety-core and request-sequence lifecycles. |
+| [integrations.md](integrations.md) | HTTP routes, GPIO assignments, configuration and external libraries. |
+| [build-and-test.md](build-and-test.md) | Build, test and flash commands. |
+
+The project-level references are [`docs/architecture.md`](../architecture.md),
+[`docs/communication.md`](../communication.md),
+[`docs/hardware.md`](../hardware.md), [`docs/roadmap.md`](../roadmap.md) and
+[`docs/safety-matrix.md`](../safety-matrix.md).
 
 ---
 
 ## Repository map
 
 ```text
-platformio.ini          # build config: [env:esp32dev] firmware, [env:native] host tests
-src/main.cpp            # wiring/glue: instantiates everything, dispatch loop
+platformio.ini          # esp32dev firmware + native host-test environments
+src/main.cpp            # wiring/glue
 include/
-  config.example.h      # committed template for credentials (gitignored config.h)
+  config.example.h      # committed template; include/config.h is gitignored
 lib/
-  ServoControl/         # SG90 wrapper (steering + head servos)
-  Ultrasonic/           # HC-SR04 wrapper (mm/cm measurement in mm)
-  ScanData/             # pure scan data model + helpers (no hardware)
-  SonarScan/            # head-sweep state machine (hardware tick)
-  MqttTransport/        # Wi-Fi + MQTT connect/reconnect/publish wrapper
-  TextDisplay/          # abstract character-grid display interface
-  Ssd1306Display/       # 128x64 SSD1306 I2C OLED driver (TextDisplay impl)
-  StatusDisplay/        # pure page renderer for the on-car display
-tools/
-  sonar_viewer.py       # PC GUI: subscribes car/scan, sends commands
-  mock_scan_publisher.py# fake car/scan source for no-hardware testing
-  requirements.txt      # PC tool dependencies
+  CarControl/           # pure safety core
+  ControlProtocol/      # JSON protocol, auth, sequence handling, serialization
+  HttpApi/              # ESP32 HTTP adapter
+  ServoControl/         # retained SG90 wrapper
+  Ultrasonic/           # retained HC-SR04 wrapper
+  OtaService/           # retained wireless-update wrapper
 test/
-  test_sonar/           # ScanData unit tests (8 cases, host)
-  test_display/         # StatusDisplay + nearestObstacle tests (7 cases, host)
-docs/                   # project + developer documentation
+  test_car_control/     # safety-core rules and throttle ramp
+  test_control_protocol/# parser, auth, sequence handling and state snapshot
+  test_config/          # committed configuration template
+docs/
 ```
 
 ---
@@ -46,57 +45,27 @@ docs/                   # project + developer documentation
 
 ```mermaid
 flowchart TB
-    subgraph pc["PC side"]
-        viewer["tools/sonar_viewer.py<br/>PyQtGraph + paho-mqtt"]
-        mock["tools/mock_scan_publisher.py<br/>(fake source)"]
-        broker["MQTT broker<br/>(Mosquitto on PC)"]
-        viewer -.SUB car/scan + PUB car/cmd.-> broker
-        mock -.PUB car/scan.-> broker
-    end
-
-    subgraph firmware["ESP32 firmware"]
-        main["src/main.cpp<br/>(glue + loop)"]
-        mqtt["lib/MqttTransport"]
-        scan["lib/SonarScan"]
-        sdata["lib/ScanData<br/>(pure)"]
-        disp["lib/StatusDisplay<br/>(pure)"]
-        oled["lib/Ssd1306Display"]
-        txt["lib/TextDisplay"]
-        sv["lib/ServoControl"]
-        us["lib/Ultrasonic"]
-    end
-
-    broker <-->|Wi-Fi / MQTT| mqtt
-    main --> mqtt
-    main --> scan
-    main --> disp
-    scan --> sdata
-    scan --> sv
-    scan --> us
-    disp --> txt
-    main --> oled
-    oled --> txt
-
-    classDef pure fill:#e8f5e9,stroke:#2e7d32
-    class sdata,disp,txt pure
+    phone["Phone browser"] --> http["HttpApi<br/>HTTP adapter"]
+    http --> endpoint["ControlEndpoint<br/>transport-neutral interface"]
+    endpoint --> protocol["ControlProtocol<br/>validation + sequencing"]
+    protocol --> core["CarControl<br/>pure safety core"]
+    core --> types["CarTypes"]
 ```
 
-Green = pure, hardware-free logic (also compiled by the native host tests).
+The safety core is the only module that decides what the car may do. It has no
+knowledge of HTTP, JSON, Wi-Fi, PWM or pins.
 
 ---
 
-## "Where do I look for..."
+## Where to look
 
 | Task | Start here |
 | ---- | ---------- |
-| Change scan step/settle timing | `src/main.cpp` constants `kScanStepDegrees`, `kSettleMs` |
-| Add a scan field to `car/scan` | `src/main.cpp` `publishScan()` + `docs/communication.md` §6 |
-| Add a new command | `src/main.cpp` `handleCommand()`; extend `communication.md` command list |
-| Trim/range a servo (e.g. steering travel) | `src/main.cpp` constants (e.g. `kSteerMinAngle`/`kSteerMaxAngle`) + `ServoControl` ctor defaults |
-| Change the MQTT reconnect behavior | `lib/MqttTransport/MqttTransport.cpp` `loop()` / `connectBroker()` |
-| Add a display page | `lib/StatusDisplay/StatusDisplay.cpp` `renderPage()` (dispatches to `renderCompact()`/`renderFull()`) + `pageCount()` |
-| Support a different display | Implement `TextDisplay`, change the instantiation in `main.cpp` |
-| Add a unit-testable helper | Put pure logic in `lib/` (no Arduino calls), add a `test/test_<x>/` suite |
-| Change pin wiring | `src/main.cpp` pin constants + `docs/hardware.md` §3 (keep in sync) |
-| Flash the car wirelessly | `pio run -t upload --upload-port <ip>` (see `build-and-test.md`) |
-| Debug, flash, run tests | `docs/developer/build-and-test.md` |
+| Change a safety rule | `lib/CarControl/CarControl.cpp` and `test/test_car_control/` |
+| Change the request or response schema | `lib/ControlProtocol/` and [`docs/communication.md`](../communication.md) |
+| Change HTTP routes or status codes | `lib/HttpApi/HttpApi.cpp` |
+| Change the boot or Wi-Fi wiring | `src/main.cpp` |
+| Add a hardware adapter | A new `lib/` module; keep hardware out of `CarControl` |
+| Add a host test | `test/test_<module>/`; see [build-and-test.md](build-and-test.md) |
+| Change pin wiring | `docs/hardware.md` §3 and the future adapter constant |
+| Run tests or flash | [build-and-test.md](build-and-test.md) |

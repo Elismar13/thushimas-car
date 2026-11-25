@@ -72,8 +72,9 @@ core's skeleton).
   across zero.
 * The native test suite is green.
 
-**Status:** in progress — #4 is this change and waits for the maintainer's
-agreement; #6 follows it.
+**Status:** complete — #4 was agreed by the maintainer; #6 implements the
+transport-neutral control endpoint, the safety-core seam, matrix rows S1–S2,
+and the requested-to-actual throttle ramp with host tests.
 
 ---
 

@@ -2,252 +2,189 @@
 
 ## 1. Overview
 
-The project is a **car-shaped mobile robot** composed of two primary computing layers:
+This branch is a **phone-controlled car** with an obstacle interlock. The
+ESP32 joins a Wi-Fi network and serves an HTTP control interface. A person
+drives from a phone; the car refuses motion near an obstacle but never steers
+itself away from one.
 
-1. Robot controller (ESP32)
-2. External computer (PC)
-
-The robot controller is responsible for real-time hardware interaction:
-
-* Throttle (rear DC motor)
-* Steering (front servo)
-* Sensor-head rotation (servo)
-* Ultrasonic acquisition
-* Safety / emergency stop
-
-The external computer is responsible for computationally heavier functionality such as visualization, mapping, experimentation, and eventually path planning.
-
-> Note: this platform is **not** a differential-drive rover. It uses throttle + steering (bicycle/Ackermann model). There is no turn-in-place.
-
----
-
-## 2. High-Level Architecture
+The architecture has one central seam: the **safety core**. Everything above
+it is transport; everything below it is hardware. The safety rules live in the
+core and nowhere else.
 
 ```text
-                    ┌──────────────────────────┐
-                    │       User / PC          │
-                    │                          │
-                    │ Visualization            │
-                    │ Map                      │
-                    │ Path Planning            │
-                    │ Commands                 │
-                    └────────────┬─────────────┘
-                                 │
-                              Wi-Fi / MQTT
-                                 │
-                    ┌────────────▼─────────────┐
-                    │          ESP32            │
-                    │                           │
-                    │ Throttle Control          │
-                    │ Steering Control          │
-                    │ Sensor-Head Control       │
-                    │ Ultrasonic Acquisition    │
-                    │ Safety / E-stop           │
-                    │ Real-Time Logic           │
-                    └──────┬───────────┬────────┘
-                           │           │
-                 ┌─────────┘           └─────────┐
-                 ▼                               ▼
-          ┌─────────────┐                 ┌─────────────┐
-          │  Actuators  │                 │   Sensors   │
-          │ rear motor  │                 │ 2× HC-SR04  │
-          │ 2× servos   │                 │ E-stop btn  │
-          └─────────────┘                 └─────────────┘
+┌──────────────────────────────┐
+│ Phone browser                │
+│ self-contained page (issue 7)│
+└──────────────┬───────────────┘
+               │ Wi-Fi / HTTP
+               │ control intent + state snapshot
+┌──────────────▼───────────────┐
+│ HTTP adapter                 │
+│ lib/HttpApi                  │
+└──────────────┬───────────────┘
+               │ ControlEndpoint
+┌──────────────▼───────────────┐
+│ Phone-facing protocol        │
+│ lib/ControlProtocol          │
+│ auth · JSON · sequencing     │
+└──────────────┬───────────────┘
+               │ ControlIntent + inputs + time
+┌──────────────▼───────────────┐
+│ Safety core                  │
+│ lib/CarControl               │
+│ rules · state · throttle ramp│
+└──────────────┬───────────────┘
+               │ MotorOutput + CarState
+┌──────────────▼───────────────┐
+│ Hardware adapters            │
+│ motor · servo · sensor · ... │
+└──────────────────────────────┘
 ```
 
----
-
-## 3. Robot Responsibilities
-
-The ESP32 should initially handle:
-
-* Throttle control (PWM, forward/reverse/stop)
-* Steering servo control
-* Sensor-head servo control
-* Ultrasonic measurements (sequential firing)
-* Safety stops (obstacle + connection timeout + E-stop)
-* Command reception
-* Telemetry transmission
-
-Later it may also handle:
-
-* Odometry (encoder + steering angle)
-* Local obstacle avoidance
-* Basic localization
-* Low-level navigation control (throttle + steer setpoints)
+The safety core performs no I/O and knows nothing about HTTP, JSON, Wi-Fi,
+PWM or pins. That makes every implemented rule deterministic and host-testable.
 
 ---
 
-## 4. External Computer Responsibilities
+## 2. Responsibilities
 
-The external system may handle:
+### Phone
 
-* Sensor visualization
-* Data logging
-* Map generation
-* Map visualization
-* Path planning
-* Experiment analysis
-* Configuration
-* User interface
+* Presents the driving page and arming controls.
+* Posts the requested throttle and steering angle at 20 Hz.
+* Keeps the sequence counter increasing.
+* Displays the returned state snapshot.
+
+The phone is not trusted to enforce safety. It authenticates, but the car
+still applies every rule locally.
+
+### ESP32
+
+* Serves the HTTP interface.
+* Authenticates requests and rejects malformed, out-of-range, stale or replayed
+  intents.
+* Runs the safety core on every accepted intent.
+* Drives the motor, servo, sensors, battery monitor and E-stop through adapters.
+* Stops when the car link goes stale and whenever a safety rule requires it.
+
+### Safety core
+
+* Owns the armed state, requested throttle, actual throttle, steering angle
+  and reported safety flags.
+* Applies the precedence and steering rules in
+  [`docs/safety-matrix.md`](safety-matrix.md).
+* Slews the actual throttle toward the requested throttle; it never jumps.
+
+### Hardware adapters
+
+* Convert the core's `MotorOutput` into TC1508A inputs and PWM duty.
+* Convert the steering angle into the SG90's servo angle.
+* Read the frontal HC-SR04, battery divider and physical E-stop.
+* Perform no policy decisions.
 
 ---
 
-## 5. Separation of Concerns
-
-The robot should not depend on the external computer for basic safety.
-
-For example:
+## 3. Module and dependency rules
 
 ```text
-Obstacle detected
-      ↓
-ESP32
-      ↓
-Immediate stop (throttle = 0)
+src/main.cpp
+  ├── HttpApi ──────── ControlEndpoint
+  └── ControlProtocol ─ ControlEndpoint
+                         └── CarControl
+
+CarControl ── CarTypes only
 ```
 
-The PC should not be required for this behavior.
+Rules:
 
-However:
+* `CarControl` may not include Arduino, ArduinoJson, Wi-Fi, WebServer or any
+  hardware wrapper.
+* `ControlProtocol` may not implement HTTP status codes or socket details.
+* `HttpApi` may not inspect or change the safety core's internals.
+* `src/main.cpp` wires modules together and owns no safety rule.
 
-```text
-Select destination
-      ↓
-PC
-      ↓
-Path planning
-      ↓
-Navigation command (throttle + steer)
-      ↓
-ESP32
-```
-
-can depend on the external system.
+This lets a future transport replace HTTP without changing a safety rule.
 
 ---
 
-## 6. Robot State
+## 4. Request and state flow
 
-The conceptual robot state is:
+```mermaid
+sequenceDiagram
+    participant Phone
+    participant HTTP as HttpApi
+    participant Protocol as ControlProtocol
+    participant Core as CarControl
+
+    Phone->>HTTP: POST /api/control + token + intent
+    HTTP->>Protocol: handleControl(token, payload, context)
+    Protocol->>Protocol: authenticate · parse · validate · check sequence
+    Protocol->>Core: update(intent, inputs, nowMs)
+    Core-->>Protocol: motor output + car state
+    Protocol-->>HTTP: response + state snapshot
+    HTTP-->>Phone: HTTP status + JSON
+```
+
+A request rejected by authentication, parsing, validation or sequencing never
+reaches the safety core. It changes neither the car nor the accepted sequence
+counter.
+
+---
+
+## 5. Car state
+
+The conceptual state is:
 
 ```text
-RobotState {
-    position        # world frame (x, y)
-    orientation     # heading theta
-    speed           # forward speed
-    throttle        # commanded throttle (-100 .. +100)
-    steeringAngle   # commanded steering angle, degrees
-    sensorData      # distance measurements
-    battery
-    currentMode     # MANUAL / AUTO / SAFETY_STOP
+CarState {
+    armed              // accepts motion
+    latched            // latched stop engaged
+    latchReason        // why it is engaged
+    estop              // physical E-stop pressed
+    interlock          // obstacle near
+    obstacleDistanceMm // nearest obstacle
+    batteryState       // ok / low / critical
+    requestedThrottle  // -100 .. +100
+    motor {
+        state          // coast / drive / brake
+        actualThrottle // -100 .. +100, slewed
+        steeringAngle  // -50 .. +50, relative to straight
+    }
 }
 ```
 
-The exact implementation will evolve.
+The state snapshot adds link and identity information: RSSI, IP address and
+uptime.
 
 ---
 
-## 7. Kinematic Model
+## 6. Motion model
 
-The car uses the **bicycle model** (rear drive + front steering).
-
-```text
-      front wheels
-         ▲ δ (steering angle)
-        / \
-       /   \
-      ●─────●  ← steered, not driven
-      │     │
-      │     │  wheelbase L
-      │     │
-      ●─────●  ← driven rear axle, speed v
-```
-
-Relationships (for small angles, with wheelbase `L`):
+The car uses a bicycle model: one rear motor drives the rear wheels and one
+front servo steers both front wheels. It cannot turn in place.
 
 ```text
-Instantaneous turning radius  R = L / tan(δ)
-Heading rate                  θ̇ = (v / L) · tan(δ)
+R = L / tan(δ)
 ```
 
-Consequences:
-
-* Turns have a minimum radius set by the max steering angle: `R_min = L / tan(δ_max)`.
-* The car cannot turn in place.
-* Steering at high throttle is more dynamic than at low throttle.
-
-The wheelbase `L` and max steering angle `δ_max` must be measured from the chassis and
-recorded (see `docs/decisions.md`) — agents should not hard-code guessed values.
+`L` and the maximum physical steering angle are not needed for the current
+branch: there is no odometry, localization or path planning. The servo travel
+limits are physical measurements recorded in
+[`docs/hardware.md`](hardware.md).
 
 ---
 
-## 8. Coordinate Systems
+## 7. Current implementation scope
 
-The project will eventually use multiple coordinate systems.
+Issue #6 implements:
 
-### Robot coordinate system
+* the HTTP control and state endpoints;
+* token authentication and strict sequence handling;
+* the transport-neutral `ControlEndpoint` interface;
+* safety-core matrix rows S1 and S2;
+* the requested-to-actual throttle ramp.
 
-Relative to the robot. Origin at the midpoint of the rear axle; X forward, Y to the left, θ is heading.
-
-```text
-        Y
-        ↑
-        │
-        │
-        ●──────→ X
-       Robot
-```
-
-### World coordinate system
-
-Fixed to the environment.
-
-```text
-        Y
-        ↑
-        │
-        │
-        └────────→ X
-       Origin
-```
-
-A transformation between these systems will be required for mapping.
-
----
-
-## 9. Final Data Flow
-
-```text
-Sensors
-   ↓
-Sensor Measurements
-   ↓
-Robot Coordinate System
-   ↓
-Localization
-   ↓
-World Coordinate System
-   ↓
-Map
-   ↓
-Path Planner
-   ↓
-Target Path
-   ↓
-Navigation Controller
-   ↓
-Throttle + Steering Commands
-   ↓
-Motor + Servos
-```
-
----
-
-## 10. Architecture Evolution
-
-The architecture is expected to evolve.
-
-Early phases should prioritize simplicity.
-
-Complex robotics algorithms should only be introduced when a previous phase demonstrates the need for them.
+The motor adapter, phone page, complete control surface and on-car sensor
+paths are later phases in [`docs/roadmap.md`](roadmap.md). The car must not be
+driven on the floor until the obstacle interlock (#11) and physical E-stop
+(#13) are implemented.
