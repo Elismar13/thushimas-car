@@ -32,9 +32,32 @@ Run `gh issue view <number> --repo Elismar13/thushimas-car --comments`.
 
 ## Blocking dependencies
 
-GitHub's **native issue dependencies** are the canonical representation. Add an edge
-with `gh api --method POST repos/Elismar13/thushimas-car/issues/<child>/dependencies/blocked_by -F issue_id=<blocker-db-id>`, where `issue_id` is the blocker's numeric **database id**
-(`gh api repos/Elismar13/thushimas-car/issues/<n> --jq .id`, _not_ the `#number`).
+GitHub's **native issue dependencies** are the canonical representation, and they work
+on this repo — use them rather than relying on the `Blocked by:` body line.
 
-Where dependencies are unavailable, fall back to a `Blocked by: #<n>, #<n>` line at the
-top of the child body. A ticket is unblocked when every blocker is closed.
+**The API form is easy to get backwards.** The **path** takes the child's **issue
+number**; the body takes the blocker's **numeric database id**:
+
+```bash
+# <number> in the path, <db id> in the body
+gh api --method POST repos/Elismar13/thushimas-car/issues/<child-number>/dependencies/blocked_by \
+  -F issue_id=<blocker-db-id>
+```
+
+Get the db id with `gh api repos/Elismar13/thushimas-car/issues/<n> --jq .id` — it is
+**not** the `#number`. Passing a number as `issue_id` returns `404 Not Found`.
+
+To read the edges back:
+
+```bash
+gh api repos/Elismar13/thushimas-car/issues/<n>/dependencies/blocked_by --jq '[.[].number]'
+```
+
+To remove an edge:
+
+```bash
+gh api --method DELETE repos/Elismar13/thushimas-car/issues/<child-number>/dependencies/blocked_by/<blocker-db-id>
+```
+
+A ticket is unblocked when every blocker is closed. The unblocked count is
+`.issue_dependencies_summary.blocked_by` on the issue.
