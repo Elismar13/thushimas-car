@@ -144,3 +144,39 @@ Follow the philosophy from `README.md`: **Build → Test → Document → Stabil
   `init: init platform io project`).
 * Never commit secrets, `.pio/`, or IDE-generated files (`.gitignore` covers these).
 * Only commit when the user asks.
+
+---
+
+## 10. Branch: `feat/phone-controlled-car`
+
+This branch pivots the project to a **phone-controlled car with an obstacle
+interlock**. `main` remains the autonomous-navigation research line and is left
+intact.
+
+* `docs/decisions.md` opens with a **Branch Overrides** table. It lists which
+  `main`-line decisions this branch replaces and which carry forward unchanged.
+  **Build for the replacements.** Sections 4, 6 and 7 of this file still describe the
+  `main`-line architecture (MQTT, the L298N, two ultrasonic sensors) — treat the
+  Branch Overrides table as authoritative wherever the two disagree, until the doc
+  surgery lands.
+* Read `CONTEXT.md` (the glossary) before writing code, tests, issues or docs. Use
+  its vocabulary; do not drift to the synonyms it lists under `_Avoid_`.
+* Read `docs/adr/0001-pivot-to-phone-controlled-car.md` for the rationale.
+
+---
+
+## 11. Agent skills
+
+### Issue tracker
+
+Issues and specs are tracked as GitHub issues on `Elismar13/thushimas-car`. See
+`docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles, default strings. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `CONTEXT.md` plus `docs/adr/`. See `docs/agents/domain.md`.
