@@ -4,6 +4,12 @@
 
 #include "ControlProtocol.h"
 
+EndpointContext freshContext() {
+    EndpointContext context;
+    context.inputs.carLinkFresh = true;
+    return context;
+}
+
 void test_parser_accepts_a_complete_control_intent(void) {
     ControlIntentParser parser;
     const std::string payload =
@@ -52,6 +58,17 @@ void test_parser_rejects_a_field_with_the_wrong_type(void) {
                           static_cast<int>(result.status));
 }
 
+void test_parser_rejects_a_negative_sequence_counter(void) {
+    ControlIntentParser parser;
+    const std::string payload =
+        R"({"t":0,"s":0,"arm":false,"latch":false,"seq":-1})";
+
+    IntentParseResult result = parser.parse(payload);
+
+    TEST_ASSERT_EQUAL_INT(static_cast<int>(IntentParseStatus::Malformed),
+                          static_cast<int>(result.status));
+}
+
 void test_parser_rejects_an_out_of_range_throttle(void) {
     ControlIntentParser parser;
     const std::string payload =
@@ -76,7 +93,7 @@ void test_parser_rejects_an_out_of_range_steering_angle(void) {
 
 void test_endpoint_accepts_an_authenticated_control_intent(void) {
     ControlProtocol protocol("shared-secret");
-    EndpointContext context;
+    EndpointContext context = freshContext();
     context.nowMs = 0;
     const std::string payload =
         R"({"t":40,"s":-15,"arm":true,"latch":false,"seq":1})";
@@ -93,7 +110,7 @@ void test_endpoint_accepts_an_authenticated_control_intent(void) {
 
 void test_endpoint_rejects_an_invalid_token_without_changing_the_car(void) {
     ControlProtocol protocol("shared-secret");
-    EndpointContext context;
+    EndpointContext context = freshContext();
     const std::string payload =
         R"({"t":100,"s":0,"arm":true,"latch":false,"seq":1})";
 
@@ -109,7 +126,7 @@ void test_endpoint_rejects_an_invalid_token_without_changing_the_car(void) {
 
 void test_endpoint_has_no_valid_token_when_none_is_configured(void) {
     ControlProtocol protocol("");
-    EndpointContext context;
+    EndpointContext context = freshContext();
     const std::string payload =
         R"({"t":0,"s":0,"arm":false,"latch":false,"seq":1})";
 
@@ -121,7 +138,7 @@ void test_endpoint_has_no_valid_token_when_none_is_configured(void) {
 
 void test_endpoint_rejects_malformed_intent_without_changing_the_car(void) {
     ControlProtocol protocol("shared-secret");
-    EndpointContext context;
+    EndpointContext context = freshContext();
     const std::string valid =
         R"({"t":40,"s":0,"arm":true,"latch":false,"seq":1})";
     protocol.handleControl("shared-secret", valid, context);
@@ -137,7 +154,7 @@ void test_endpoint_rejects_malformed_intent_without_changing_the_car(void) {
 
 void test_endpoint_rejects_out_of_range_intent_without_changing_the_car(void) {
     ControlProtocol protocol("shared-secret");
-    EndpointContext context;
+    EndpointContext context = freshContext();
     const std::string valid =
         R"({"t":40,"s":0,"arm":true,"latch":false,"seq":1})";
     protocol.handleControl("shared-secret", valid, context);
@@ -154,7 +171,7 @@ void test_endpoint_rejects_out_of_range_intent_without_changing_the_car(void) {
 
 void test_endpoint_drops_stale_and_replayed_sequences(void) {
     ControlProtocol protocol("shared-secret");
-    EndpointContext context;
+    EndpointContext context = freshContext();
     const std::string first =
         R"({"t":40,"s":0,"arm":true,"latch":false,"seq":10})";
     protocol.handleControl("shared-secret", first, context);
@@ -184,7 +201,7 @@ void test_endpoint_drops_stale_and_replayed_sequences(void) {
 
 void test_accepted_response_contains_the_state_snapshot(void) {
     ControlProtocol protocol("shared-secret");
-    EndpointContext context;
+    EndpointContext context = freshContext();
     context.link.rssi = -55;
     context.link.ip = "192.168.1.20";
     context.link.uptimeMs = 1234;
@@ -211,7 +228,7 @@ void test_accepted_response_contains_the_state_snapshot(void) {
 
 void test_state_endpoint_requires_the_shared_token(void) {
     ControlProtocol protocol("shared-secret");
-    EndpointContext context;
+    EndpointContext context = freshContext();
 
     ControlResponse response = protocol.state("", context);
 
@@ -221,7 +238,7 @@ void test_state_endpoint_requires_the_shared_token(void) {
 
 void test_state_endpoint_returns_the_snapshot_to_an_authenticated_caller(void) {
     ControlProtocol protocol("shared-secret");
-    EndpointContext context;
+    EndpointContext context = freshContext();
 
     ControlResponse response = protocol.state("shared-secret", context);
 
@@ -236,6 +253,7 @@ int main() {
     RUN_TEST(test_parser_rejects_malformed_json);
     RUN_TEST(test_parser_rejects_a_missing_field);
     RUN_TEST(test_parser_rejects_a_field_with_the_wrong_type);
+    RUN_TEST(test_parser_rejects_a_negative_sequence_counter);
     RUN_TEST(test_parser_rejects_an_out_of_range_throttle);
     RUN_TEST(test_parser_rejects_an_out_of_range_steering_angle);
     RUN_TEST(test_endpoint_accepts_an_authenticated_control_intent);

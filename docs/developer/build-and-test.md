@@ -51,7 +51,7 @@ includes Arduino or ESP32 APIs belongs in `lib_ignore`.
 | Suite | Cases | Covers |
 | ----- | ----- | ------ |
 | `test_car_control` | 7 | boot/disarmed behaviour, arming, matrix rows S1–S2, throttle ramp up/down/across zero |
-| `test_control_protocol` | 15 | valid, malformed, missing, wrong-type and out-of-range intents; token authentication; stale/replayed sequences; state snapshot |
+| `test_control_protocol` | 16 | valid, malformed, missing, wrong-type and out-of-range intents; token authentication; stale/replayed sequences; state snapshot |
 | `test_config` | 4 | committed configuration template, including the control token and absence of broker settings |
 
 Tests use Unity's `TEST_ASSERT_*` macros and a `main()` that calls
