@@ -4,9 +4,9 @@
 #include <ESP32Servo.h>
 
 // Thin SG90 wrapper. Each servo can be configured with its own angular travel
-// (hard limits); setAngle() clamps to it. The sensor-head servo uses the
-// default [0, 180]; the steering servo uses a tighter [40, 140] because of its
-// physical steering linkage. Motor/servo units are degrees.
+// (hard limits); setAngle() clamps to it. The phone-controlled car uses one
+// steering servo with the tighter [40, 140] travel imposed by its physical
+// linkage. Motor/servo units are degrees.
 class ServoControl {
 public:
     static constexpr int kDefaultMinAngle = 0;

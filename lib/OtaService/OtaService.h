@@ -5,12 +5,13 @@
 #include <functional>
 
 // Thin OTA service around the ESP32 ArduinoOTA client (UDP 3232, the
-// "Arduino OTA" protocol that PlatformIO's `espota` uploader speaks). Runs
-// alongside MQTT without conflict: MQTT is TCP 1883, OTA is UDP 3232.
+// "Arduino OTA" protocol that PlatformIO's `espota` uploader speaks). It can
+// run alongside the HTTP control API without conflict: HTTP uses TCP while OTA
+// uses UDP 3232.
 //
-// During an update the caller's loop() keeps running; the firmware should stop
-// the scanner via setOnStart() so no sweep happens mid-flash. After the image
-// is written the ESP32 reboots and the app reconnects MQTT as usual.
+// During an update the caller's loop() keeps running; the firmware should make
+// the car safe via setOnStart() so it cannot move mid-flash. After the image
+// is written the ESP32 reboots and the phone reconnects to the control API.
 class OtaService {
 public:
     OtaService(const char* hostname);
@@ -25,7 +26,7 @@ public:
     // begin() has run.
     void handle();
 
-    // Invoked once when an update begins (e.g. stop any active scanning).
+    // Invoked once when an update begins (for example, to stop the car).
     void setOnStart(std::function<void()> callback);
 
 private:

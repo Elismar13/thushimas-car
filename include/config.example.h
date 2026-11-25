@@ -11,14 +11,6 @@
 #define WIFI_PASSWORD "your-password"
 #endif
 
-#ifndef MQTT_BROKER_HOST
-#define MQTT_BROKER_HOST "192.168.1.100"
-#endif
-
-#ifndef MQTT_BROKER_PORT
-#define MQTT_BROKER_PORT 1883
-#endif
-
-#ifndef MQTT_CLIENT_ID
-#define MQTT_CLIENT_ID "esp32-car"
+#ifndef CAR_HOSTNAME
+#define CAR_HOSTNAME "thushimas-car"
 #endif
