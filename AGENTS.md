@@ -8,7 +8,7 @@ it is a contract for how work should be done here.
 ## 1. What this project is
 
 On this branch, an experimental **phone-controlled car** with an obstacle
-interlock. It is **not** a differential-drive rover. The platform is a car:
+interlock. The car has:
 
 * One rear DC motor provides throttle (forward/reverse) through a TC1508A bridge.
 * One front servo steers both front wheels (bicycle/Ackermann model).
@@ -26,7 +26,7 @@ The `main` branch retains the abandoned autonomous-navigation research line.
 
 | File | What it gives you |
 | ---- | ----------------- |
-| `docs/architecture.md` | System layers, robot state, kinematic model, data flow |
+| `docs/architecture.md` | System layers, car state, kinematic model, data flow |
 | `docs/hardware.md` | BOM, the branch's GPIO pin map (§3), power architecture, wiring |
 | `docs/communication.md` | HTTP control endpoint, token authentication, JSON schemas, safety behavior |
 | `docs/roadmap.md` | Phase definitions and Definitions of Done (DoD) |
