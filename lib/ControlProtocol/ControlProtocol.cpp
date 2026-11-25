@@ -148,16 +148,13 @@ ControlResponse ControlProtocol::handleControl(const std::string& token,
 
 ControlResponse ControlProtocol::state(const std::string& token,
                                       const EndpointContext& context) {
-    ControlResponse response;
-    response.snapshot = snapshot(context.link);
-
     if (!tokenMatches(token_, token)) {
-        response.status = ControlStatus::Unauthorized;
-        serializeError(response.status, response.body);
-        return response;
+        return reject(ControlStatus::Unauthorized, context.link);
     }
 
+    ControlResponse response;
     response.status = ControlStatus::Accepted;
+    response.snapshot = snapshot(context.link);
     serializeSnapshot(response.snapshot, response.body);
     return response;
 }
