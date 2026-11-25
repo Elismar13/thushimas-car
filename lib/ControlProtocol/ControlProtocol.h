@@ -86,6 +86,7 @@ public:
 
 private:
     StateSnapshot snapshot(const LinkInfo& link) const;
+    ControlResponse reject(ControlStatus status, const LinkInfo& link) const;
 
     std::string token_;
     ControlIntentParser parser_;

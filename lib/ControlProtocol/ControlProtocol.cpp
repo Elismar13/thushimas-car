@@ -124,25 +124,16 @@ ControlResponse ControlProtocol::handleControl(const std::string& token,
     ControlResponse response;
 
     if (!tokenMatches(token_, token)) {
-        response.status = ControlStatus::Unauthorized;
-        response.snapshot = snapshot(context.link);
-        serializeError(response.status, response.body);
-        return response;
+        return reject(ControlStatus::Unauthorized, context.link);
     }
 
     const IntentParseResult parsed = parser_.parse(payload);
     if (parsed.status != IntentParseStatus::Valid) {
-        response.status = ControlStatus::InvalidRequest;
-        response.snapshot = snapshot(context.link);
-        serializeError(response.status, response.body);
-        return response;
+        return reject(ControlStatus::InvalidRequest, context.link);
     }
 
     if (hasLastSequence_ && parsed.intent.sequence <= lastSequence_) {
-        response.status = ControlStatus::StaleSequence;
-        response.snapshot = snapshot(context.link);
-        serializeError(response.status, response.body);
-        return response;
+        return reject(ControlStatus::StaleSequence, context.link);
     }
 
     control_.update(parsed.intent, context.inputs, context.nowMs);
@@ -168,6 +159,15 @@ ControlResponse ControlProtocol::state(const std::string& token,
 
     response.status = ControlStatus::Accepted;
     serializeSnapshot(response.snapshot, response.body);
+    return response;
+}
+
+ControlResponse ControlProtocol::reject(ControlStatus status,
+                                      const LinkInfo& link) const {
+    ControlResponse response;
+    response.status = status;
+    response.snapshot = snapshot(link);
+    serializeError(status, response.body);
     return response;
 }
 

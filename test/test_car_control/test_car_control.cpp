@@ -46,11 +46,12 @@ void test_actual_throttle_ramps_to_full_in_three_hundred_milliseconds(void) {
     ControlIntent fullThrottle;
     fullThrottle.requestedThrottle = 100;
 
-    CarState after50ms = control.update(fullThrottle, freshCarLinkInputs(), 50);
-    TEST_ASSERT_EQUAL_INT(17, after50ms.motor.actualThrottle);
+    CarState state;
+    for (uint32_t nowMs = 50; nowMs <= 300; nowMs += 50) {
+        state = control.update(fullThrottle, freshCarLinkInputs(), nowMs);
+    }
 
-    CarState after300ms = control.update(fullThrottle, freshCarLinkInputs(), 300);
-    TEST_ASSERT_EQUAL_INT(100, after300ms.motor.actualThrottle);
+    TEST_ASSERT_EQUAL_INT(100, state.motor.actualThrottle);
 }
 
 void test_actual_throttle_does_not_jump_after_a_long_update_gap(void) {
@@ -90,14 +91,20 @@ void test_actual_throttle_ramps_down_to_zero(void) {
 
     ControlIntent fullThrottle;
     fullThrottle.requestedThrottle = 100;
-    control.update(fullThrottle, freshCarLinkInputs(), 300);
+    for (uint32_t nowMs = 50; nowMs <= 300; nowMs += 50) {
+        control.update(fullThrottle, freshCarLinkInputs(), nowMs);
+    }
 
     ControlIntent stop;
-    CarState after50ms = control.update(stop, freshCarLinkInputs(), 350);
-    TEST_ASSERT_EQUAL_INT(83, after50ms.motor.actualThrottle);
+    CarState state;
+    for (uint32_t nowMs = 350; nowMs <= 650; nowMs += 50) {
+        state = control.update(stop, freshCarLinkInputs(), nowMs);
+        if (nowMs == 350) {
+            TEST_ASSERT_EQUAL_INT(83, state.motor.actualThrottle);
+        }
+    }
 
-    CarState after300ms = control.update(stop, freshCarLinkInputs(), 650);
-    TEST_ASSERT_EQUAL_INT(0, after300ms.motor.actualThrottle);
+    TEST_ASSERT_EQUAL_INT(0, state.motor.actualThrottle);
 }
 
 void test_actual_throttle_crosses_zero_without_skipping_it(void) {
@@ -155,6 +162,8 @@ int main() {
     RUN_TEST(test_car_is_stopped_and_disarmed_on_boot);
     RUN_TEST(test_disarmed_car_refuses_throttle_and_steering);
     RUN_TEST(test_actual_throttle_ramps_to_full_in_three_hundred_milliseconds);
+    RUN_TEST(test_actual_throttle_does_not_jump_after_a_long_update_gap);
+    RUN_TEST(test_high_frequency_updates_do_not_exceed_the_ramp_rate);
     RUN_TEST(test_actual_throttle_ramps_down_to_zero);
     RUN_TEST(test_actual_throttle_crosses_zero_without_skipping_it);
     RUN_TEST(test_armed_car_with_zero_throttle_coasts_and_stays_armed);

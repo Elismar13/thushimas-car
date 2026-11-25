@@ -41,8 +41,11 @@ The car:
 
 ## 2. Throttle ramp
 
-The actual throttle covers the full `-100` … `+100` range in 300 ms. The core
-uses injected time, so host tests never wait.
+At the phone's 20 Hz update cadence, the actual throttle covers the full
+`-100` … `+100` range in 300 ms. A fractional remainder prevents rounding drift
+across updates. No single update changes the actual throttle by more than 17
+points, so a delayed update cannot jump to full scale. The core uses injected
+time, so host tests never wait.
 
 When the requested throttle changes sign, the actual throttle reaches exactly
 zero before it becomes negative (or positive). This gives the later motor

@@ -13,9 +13,14 @@ public:
     const CarState& state() const;
 
 private:
-    static int maxThrottleStep(uint32_t elapsedMs);
+    static constexpr uint32_t kThrottleRampPeriodMs = 300;
+    static constexpr uint32_t kThrottleRange = 100;
+    static constexpr int kMaxThrottleStep = 17;
+
+    int availableThrottleStep(uint32_t elapsedMs);
 
     CarState state_;
     uint32_t lastUpdateMs_ = 0;
+    int32_t rampRemainder_ = 0;
     bool hasUpdated_ = false;
 };

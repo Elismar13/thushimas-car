@@ -161,8 +161,11 @@ implements matrix rows S1 and S2 and the throttle ramp:
 * An arm request arms the car. While armed, the requested throttle applies and
   the steering angle is applied.
 * The actual throttle ramps toward the requested throttle at a bounded rate:
-  100% in 300 ms. The ramp works in both directions and reaches exactly zero
-  before changing direction.
+  100% in 300 ms at the phone's 20 Hz update cadence. A fractional remainder
+  prevents rounding drift across updates. No single update changes the actual
+  throttle by more than 17 points, so a delayed update cannot jump to full
+  scale. The ramp works in both directions and reaches exactly zero before
+  changing direction.
 
 The stale-link stop, latched stop, physical E-stop, obstacle interlock and
 battery cut are deliberately separate tickets. The car must not be driven on

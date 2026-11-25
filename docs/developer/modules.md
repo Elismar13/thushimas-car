@@ -60,8 +60,11 @@ Issue #6 implements matrix rows S1 and S2 and the throttle ramp:
 * a disarmed car refuses throttle and returns steering to straight;
 * an arm request arms the car;
 * an armed car applies requested throttle and steering;
-* actual throttle reaches the requested throttle in 300 ms, in either
-  direction, and reaches exactly zero before changing direction.
+* actual throttle reaches the requested throttle in 300 ms at the phone's 20 Hz
+  update cadence, in either direction, and reaches exactly zero before changing
+  direction;
+* no single update changes the actual throttle by more than 17 points, so a
+  delayed update cannot jump to full scale.
 
 Rows S3–S8 are implemented by their later tickets. The input and state fields
 already exist so those tickets extend the core rather than changing the

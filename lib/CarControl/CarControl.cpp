@@ -24,7 +24,7 @@ CarState CarControl::update(const ControlIntent& intent, const CarInputs& inputs
         state_.motor.state = MotorState::Coast;
     }
 
-    const int step = maxThrottleStep(elapsedMs);
+    const int step = availableThrottleStep(elapsedMs);
     int actual = state_.motor.actualThrottle;
     const int requested = state_.requestedThrottle;
 
@@ -49,11 +49,24 @@ CarState CarControl::update(const ControlIntent& intent, const CarInputs& inputs
     return state_;
 }
 
-int CarControl::maxThrottleStep(uint32_t elapsedMs) {
-    if (elapsedMs >= 300) {
-        return 100;
+int CarControl::availableThrottleStep(uint32_t elapsedMs) {
+    // One throttle point represents three milliseconds of ramp time. Carrying
+    // the fractional remainder keeps the average rate independent of cadence.
+    const int64_t scaledElapsed =
+        static_cast<int64_t>(elapsedMs) * kThrottleRange + rampRemainder_;
+    int64_t step = (scaledElapsed + kThrottleRampPeriodMs / 2) /
+                   kThrottleRampPeriodMs;
+
+    if (step > kMaxThrottleStep) {
+        // A delayed update moves at most one normal 50 ms slice; it never
+        // catches up in one jump.
+        rampRemainder_ = 0;
+        return kMaxThrottleStep;
     }
-    return static_cast<int>((100UL * elapsedMs + 299UL) / 300UL);
+
+    rampRemainder_ = static_cast<int32_t>(
+        scaledElapsed - step * kThrottleRampPeriodMs);
+    return static_cast<int>(step);
 }
 
 const CarState& CarControl::state() const {

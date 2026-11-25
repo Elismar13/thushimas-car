@@ -7,17 +7,18 @@ it is a contract for how work should be done here.
 
 ## 1. What this project is
 
-An experimental **autonomous car** built incrementally. It is **not** a differential-drive rover. The platform is a car:
+On this branch, an experimental **phone-controlled car** with an obstacle
+interlock. It is **not** a differential-drive rover. The platform is a car:
 
-* One rear DC motor = throttle (forward/reverse) via an L298N.
+* One rear DC motor provides throttle (forward/reverse) through a TC1508A bridge.
 * One front servo steers both front wheels (bicycle/Ackermann model).
-* One second servo rotates a head carrying the two HC-SR04 sensors, mounted facing opposite
-  ways so a 180° head sweep covers 360°.
+* One fixed frontal HC-SR04 refuses throttle when an obstacle is near.
 * ESP32 DevKit V1 (WROOM-32), PlatformIO + Arduino framework.
-* PC talks to the car over Wi-Fi + MQTT (JSON), broker runs on the PC.
+* A phone browser talks to the car over Wi-Fi + HTTP; there is no PC or broker.
 
-There is **no turn-in-place**. Movement is expressed as throttle (`-100..+100`) and a
-steering angle (degrees). Kinematics: `R = L / tan(δ)`.
+There is **no turn-in-place**. Movement is expressed as requested throttle
+(`-100..+100`) and a steering angle (degrees). Kinematics: `R = L / tan(δ)`.
+The `main` branch retains the abandoned autonomous-navigation research line.
 
 ---
 

@@ -119,6 +119,7 @@ replacement, not the original.
 | 77 | Plan of record | The branch's plan of record is **`docs/roadmap.md`** (the five phases) and **`docs/safety-matrix.md`** (one row per safety rule). The `main`-line roadmap is archived at `docs/archive/main-line-roadmap.md` and is not worked on. Every matrix row becomes at least one host test before the rule it describes is coded, and the safety core is not written until both documents are agreed | Process, testing |
 | 78 | Safety precedence | The safety core evaluates the rules in the order stated in `docs/safety-matrix.md` §3 — E-stop, latched stop, disarmed, stale car link, obstacle within the stop threshold, otherwise the requested throttle applies, slewed. A **critical battery** enters through the latched stop, with the battery as its reason; a **low battery** only warns | Safety, behaviour |
 | 79 | Steering under the stops | The steering angle is applied only when the car is armed, the car link is fresh, and neither the E-stop nor a latched stop is engaged; the **interlock leaves the steering angle applied**. In every other case the angle returns to straight (`docs/safety-matrix.md` §4) | Safety, behaviour |
+| 80 | Throttle slew rate | At the phone's **20 Hz** update cadence, the actual throttle covers the full `-100` … `+100` range in **300 ms**. A fractional remainder prevents rounding drift across updates. A single update may change the actual throttle by at most **17 points**, so a delayed update cannot jump to full scale. Resolves Open #20 | Safety, firmware |
 
 ---
 
@@ -147,7 +148,7 @@ replacement, not the original.
 | 17 | Telemetry transport | RESOLVED by Decided #58 | — |
 | 18 | Pivot ADR | RESOLVED by Decided #54 | — |
 | 19 | Step-up converter output | RESOLVED by Decided #56 | — |
-| 20 | Throttle slew rate | The maximum rate at which the actual throttle ramps toward the requested throttle (realised as a motor-duty ramp) | v1 |
+| 20 | Throttle slew rate | RESOLVED by Decided #80 — at 20 Hz the actual throttle covers full scale in 300 ms, with a 17-point maximum change per update | — |
 | 21 | Motor driver for the stepper | RESOLVED by Decided #59 | — |
 | 22 | Stepper drive semantics | RESOLVED by Decided #60 (idle coils); the sequencer's timing model is settled in the roadmap | — |
 | 23 | Power switch vs. E-stop button | RESOLVED by Decided #61 and #64 | — |
