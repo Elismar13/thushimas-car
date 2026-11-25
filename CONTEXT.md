@@ -17,14 +17,14 @@ What the user is asking for, as sent from the phone: -100 (full reverse) through
 _Avoid_: Speed, throttle level, target speed
 
 **Actual throttle**:
-The speed the motor is running at right now. It ramps toward the **requested throttle** at
+The throttle the motor is running at right now. It ramps toward the **requested throttle** at
 a bounded rate instead of jumping to it.
 _Avoid_: Speed, applied throttle
 
-**Step rate**:
-How fast the rear motor's steps are issued. The actual throttle is realised as a step
-rate.
-_Avoid_: RPM, pulse rate, frequency
+**Motor duty**:
+The PWM duty applied to the motor driver's active input. The actual throttle is realised as
+a motor duty.
+_Avoid_: Step rate, RPM, pulse rate, frequency
 
 **Steering angle**:
 The direction the front wheels point, in degrees, relative to **straight**. Negative is

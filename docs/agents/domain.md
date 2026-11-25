@@ -32,7 +32,7 @@ hypothesis, a test name), use the term as defined in `CONTEXT.md`. Don't drift t
 synonyms the glossary explicitly avoids.
 
 Key terms for the current branch: **Car**, **Throttle**, **Requested throttle**,
-**Actual throttle**, **Step rate**, **Steering angle**, **Straight**,
+**Actual throttle**, **Motor duty**, **Steering angle**, **Straight**,
 **Obstacle avoidance**, **Interlock**, **Stop threshold**, **E-stop**,
 **Latched stop**, **Armed**, **Blind spot**, **Battery state**, **Low battery**,
 **Critical battery**, **Charging**, **Car link**, **Heartbeat**, **Control intent**,

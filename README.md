@@ -1,5 +1,12 @@
 # Autonomous Car
 
+> **Branch status — `feat/phone-controlled-car`.** This README still describes
+> the `main`-line research platform. The branch pivots to a phone-controlled car
+> with an obstacle interlock: its plan of record is
+> [`docs/roadmap.md`](docs/roadmap.md) and
+> [`docs/safety-matrix.md`](docs/safety-matrix.md), and the full README rewrite
+> is tracked in issue #18.
+
 An experimental autonomous mobile robot designed to progressively evolve from a remotely controlled car into an autonomous indoor navigation platform.
 
 The platform is a **car**: a single rear motor provides throttle (forward/reverse) and a front servo steers the front wheels (bicycle/Ackermann model). It is not a differential-drive rover — there is no turn-in-place.
@@ -87,7 +94,11 @@ Avoid implementing future functionality prematurely.
 
 ---
 
-## Roadmap
+## Roadmap — the `main` line
+
+This branch's plan of record is [`docs/roadmap.md`](docs/roadmap.md); the
+`main`-line phases are archived at
+[`docs/archive/main-line-roadmap.md`](docs/archive/main-line-roadmap.md).
 
 | Phase | Objective                  | Status |
 | ----- | -------------------------- | ------ |
@@ -135,7 +146,8 @@ copy from `include/config.example.h`).
 * [`docs/hardware.md`](docs/hardware.md) — bill of materials, pin map, power architecture
 * [`docs/communication.md`](docs/communication.md) — MQTT/JSON protocol, topics, safety behavior
 * [`docs/local-development.md`](docs/local-development.md) — local setup: MQTT broker, PC tools, firmware config, end-to-end checks
-* [`docs/roadmap.md`](docs/roadmap.md) — phase definitions and Definitions of Done
+* [`docs/roadmap.md`](docs/roadmap.md) — the branch's phases and their Definitions of Done
+* [`docs/safety-matrix.md`](docs/safety-matrix.md) — the safety rules, one row per situation
 * [`docs/decisions.md`](docs/decisions.md) — decided choices vs open (TBD) items
 * [`docs/developer/`](docs/developer/index.md) — developer reference: modules, data flows, state machines, integrations, build & test
 

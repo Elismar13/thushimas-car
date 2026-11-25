@@ -29,6 +29,7 @@ steering angle (degrees). Kinematics: `R = L / tan(δ)`.
 | `docs/hardware.md` | BOM, the branch's GPIO pin map (§3), power architecture, wiring |
 | `docs/communication.md` | MQTT topics, JSON command/telemetry schemas, safety behavior |
 | `docs/roadmap.md` | Phase definitions and Definitions of Done (DoD) |
+| `docs/safety-matrix.md` | The safety rules as a matrix — one row per situation, one test per row |
 | `docs/decisions.md` | `DECIDED` choices vs open `TBD` items + change policy |
 | `docs/developer/index.md` | Developer reference: modules, data flows, state machines, integrations, build & test |
 
@@ -55,13 +56,12 @@ src/       # firmware source (single evolving PlatformIO project)
 lib/       # firmware libraries
 include/   # firmware public headers (incl. gitignored config.h)
 test/      # unit tests
-tools/     # PC-side tooling (MQTT viewer, mock publisher)
 docs/      # project documentation (see §2)
 platformio.ini
 ```
 
 Phases are **not** separate folders. Each phase milestone is a git tag
-(e.g. `phase-1-throttle-steering`); phase definitions live in `docs/roadmap.md`.
+(e.g. `phase-1-bench`); phase definitions live in `docs/roadmap.md`.
 
 ---
 
@@ -132,7 +132,8 @@ PlatformIO is available at `~/.platformio/penv/bin/pio` (not on PATH by default)
 Follow the philosophy from `README.md`: **Build → Test → Document → Stabilize → Expand.**
 
 * Do not begin a phase whose previous phase's DoD is not met.
-* Do not jump ahead to later-phase functionality (no path planning in Phase 1).
+* Do not jump ahead to later-phase functionality. The roadmap's phases are a
+  dependency order, not a wish list.
 * When starting a phase, re-read its Objective and DoD in `docs/roadmap.md`; implement
   exactly the deliverables listed.
 
