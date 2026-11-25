@@ -26,7 +26,7 @@ steering angle (degrees). Kinematics: `R = L / tan(δ)`.
 | File | What it gives you |
 | ---- | ----------------- |
 | `docs/architecture.md` | System layers, robot state, kinematic model, data flow |
-| `docs/hardware.md` | BOM, proposed GPIO pin map, power architecture |
+| `docs/hardware.md` | BOM, the branch's GPIO pin map (§3), power architecture, wiring |
 | `docs/communication.md` | MQTT topics, JSON command/telemetry schemas, safety behavior |
 | `docs/roadmap.md` | Phase definitions and Definitions of Done (DoD) |
 | `docs/decisions.md` | `DECIDED` choices vs open `TBD` items + change policy |

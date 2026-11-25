@@ -194,7 +194,7 @@ and skips the I2C write when the row is unchanged.
 | `begin()` | `Wire.begin(sda, scl)` + init + clear |
 
 Wiring: SDA = GPIO21, SCL = GPIO22, VCC = 3.3 V, GND. Long runs may need
-~4.7 kΩ pull-ups (see `docs/hardware.md` §4).
+~4.7 kΩ pull-ups. The OLED is removed on this branch (DECIDED #44).
 
 ### `lib/StatusDisplay` — pure page renderer (host-tested)
 

@@ -25,12 +25,13 @@ replacement, not the original.
 | #16 Repo structure (single evolving firmware) | #43 | Selective rewrite: research modules deleted, new ones added |
 | #29 PC GUI | #44 | The desktop viewer is removed; a phone web app replaces it |
 | #30, #31, #35 On-car display + `TextDisplay` seam | #44 | The OLED and its display abstraction are removed |
-| #3, #4, #7, #8 Motor driver, rear drive, battery, regulation | #41 | **Carried forward unchanged** — L298N and 2× 18650 stay |
+| #3, #4, #7, #8 Motor driver, rear drive, battery, regulation | #50, #55, #56, #59 | **Replaced** — the L298N and the 7.4 V series pack are gone: a TC1508A bridge, a 1S2P pack behind a step-up converter, and one 5 V rail |
 | #9, #10 E-stop (software + physical) | — | **Carried forward unchanged** — see § Safety Invariants |
 | #11 Wi-Fi (router first, AP fallback) | #38 | **Carried forward unchanged** — the phone reaches the car over it |
 | #19, #20, #22 Driver libraries, wrapper policy, ultrasonic driver | #43 | **Carried forward unchanged** — `NewPing` and `ESP32Servo` stay |
 | #24 Wi-Fi config (`include/config.h`) | #38 | **Carried forward unchanged** |
 | #32, #33 Steering range and `STEER` mapping | — | **Carried forward unchanged** |
+| #18 Pin map (main-line proposal) | #71 | The branch pin map replaces it — see `docs/hardware.md` §3 |
 | #34 OTA updates | — | **Carried forward unchanged** — wireless flash is now the primary path |
 
 ---
@@ -41,12 +42,12 @@ replacement, not the original.
 | - | -------- | ----- | ------ |
 | 1 | Platform | Car: rear throttle motor + front steering servo (bicycle/Ackermann), not differential drive | Architecture, commands, kinematics, phases |
 | 2 | Steering | One front servo steers both front wheels | Kinematic model (δ_max), hardware |
-| 3 | Rear drive | Single DC motor through a differential axle | One L298N channel |
-| 4 | Motor driver | L298N | Wiring, PWM control, power |
-| 5 | Servos | 2× SG90 micro servo (steering + sensor head) | Power, PWM, torque limits |
-| 6 | Ultrasonic | 2× HC-SR04 on a shared rotating head | Sequential firing, level shifting |
-| 7 | Battery | 2× 18650 (7.4 V nominal) | Power rails |
-| 8 | Regulation | Separate 5 V logic rail; motor rail independent | Brownout avoidance |
+| 3 | Rear drive | Single DC motor through a differential axle — SUPERSEDED by #55 and #59 | Throttle |
+| 4 | Motor driver | L298N — SUPERSEDED by #59 (TC1508A) | Wiring, PWM control, power |
+| 5 | Servos | 2× SG90 micro servo (steering + sensor head) — SUPERSEDED by #45 (one steering servo) | Power, PWM, torque limits |
+| 6 | Ultrasonic | 2× HC-SR04 on a shared rotating head — SUPERSEDED by #45 (one frontal sensor) | Sequential firing, level shifting |
+| 7 | Battery | 2× 18650 (7.4 V nominal) — SUPERSEDED by #50 (1S2P, 3.7 V nominal) | Power rails |
+| 8 | Regulation | Separate 5 V logic rail; motor rail independent — SUPERSEDED by #56 (one 5 V rail for every load) | Brownout avoidance |
 | 9 | E-stop | Software (timeout + ESTOP) **and** physical button | Safety, GPIO pin |
 | 10 | Controller | ESP32 DevKit V1 (WROOM-32), PlatformIO/Arduino | Pin map, toolchain |
 | 11 | Wi-Fi | Router mode first, ESP32 AP fallback | Transport |
@@ -56,7 +57,7 @@ replacement, not the original.
 | 15 | Environment | Small room (< 5 m) | Thresholds, map scale |
 | 16 | Repo structure | Single evolving PlatformIO firmware; phases as git tags + docs | Layout |
 | 17 | Reverse | Forward **and** reverse throttle | Phase 1, protocol |
-| 18 | Pin map | Proposed GPIO allocation in `docs/hardware.md` | Wiring |
+| 18 | Pin map | Proposed GPIO allocation in `docs/hardware.md` — SUPERSEDED by #71 | Wiring |
 | 19 | Driver libraries | Mature external libraries via `lib_deps`: `teckel12/NewPing` (HC-SR04) and `madhephaestus/ESP32Servo` (servos) | Phase 1+ |
 | 20 | Wrapper policy | Thin in-house wrappers (`lib/ServoControl`, `lib/Ultrasonic`) keep a stable mm/degrees interface; external libraries do the real work | Everywhere |
 | 21 | Scan geometry | One head servo rotates a head carrying two HC-SR04s facing opposite (180° apart); 180° head sweep → 360° combined coverage | Phase 4 |
@@ -109,6 +110,12 @@ replacement, not the original.
 | 68 | Stop states | **Coast** (`0,0`) for an ordinary stop — the car rolls freely. **Brake** (`1,1`) for the latched stop and the physical E-stop, where the car should stop hard rather than roll. Leaving brake requires passing through standby first, per #67 | Firmware, behaviour |
 | 69 | PWM frequency | **16 kHz**, 8-bit. The TC1508A is a MOSFET bridge, so high-frequency chopping is efficient and inaudible — unlike the L298N, where ~2 kHz was the ceiling. The motor's ~10 ms electrical time constant is far longer than the 62 µs PWM period, so throttle maps near-linearly to speed | Firmware |
 | 70 | Driver thermal limit | The TC1508A's maximum dissipation is **1.73 W** (θJA 75 °C/W). At the motor's 500 mA the bridge drops ~0.5 W, which is fine — but a **stalled** motor can pull ~1.5 A and dissipate ~4.5 W, well over the limit. The chip has no current limiting, so the obstacle interlock is the only protection against thermal damage | Hardware, safety |
+| 71 | Branch pin map | The pin map lives in `docs/hardware.md` §3: motor driver `INA` = GPIO 32, `INB` = GPIO 33, steering servo = GPIO 16, ultrasonic `TRIG` = GPIO 25, `ECHO` = GPIO 26, E-stop button = GPIO 4, battery tap = GPIO 35 (ADC1_CH7). Freed by the removals: GPIO 17 (head servo), GPIO 13/14/27 (L298N), GPIO 21/22 (OLED I²C), GPIO 34 (encoder), GPIO 36–39 unused. GPIO 6–11 stay flash pins; GPIO 0/2/5/12/15 stay strapping pins | Wiring, firmware |
+| 72 | Battery divider | The pack is measured with a **47 kΩ / 10 kΩ** divider into GPIO 35, with a **100 nF** filter at the tap. The pack maps to 0.44–0.74 V across its range, the source impedance is 8.3 kΩ, and the ESP32 resolves the pack to about 5 mV. The divider sits on **ADC1** because ADC2 is unusable while Wi-Fi is on | Hardware, firmware |
+| 73 | Ultrasonic level shifting | The 5 V echo is divided with **10 kΩ / 15 kΩ** to 3.0 V at the pin — a 0.3 V margin below the 3.3 V rail. The trigger stays a direct 3.3 V signal because a typical HC-SR04's `VIH` (≈0.7 × Vcc = 3.5 V) is only marginally above it; a **74AHCT125** on the trigger is the documented fallback if the sensor will not trigger reliably | Hardware, wiring |
+| 74 | Power protection ratings | Adds the ratings to DECIDED #61: the pack's positive lead carries a **5 A slow-blow fuse** and a **maintained SPST switch rated ≥5 A DC**, both ahead of the step-up converter. The rating is sized for the pack-side current — the 2.5 A worst case on the 5 V rail is about 4 A drawn from the cells — not for the 5 V output current | Hardware, safety |
+| 75 | Step-up converter rating | Adds the rating to DECIDED #56: the converter supplies **5 V at ≥2 A continuous**, with **3 A (15 W) recommended** so a stalled motor and a stalled servo still fit. Its output is set to **5.0 V with a multimeter** before anything is connected. A single 5 V rail feeds every load | Hardware, power |
+| 76 | E-stop pin | The E-stop button is on **GPIO 4**, read with the internal pull-up and active low (DECIDED #64). This supersedes the parent spec's "input-only pin with the internal pull-up" wording: GPIO 34–39 are input-only but have **no** internal pull-up, so the pull-up and the pin cannot both be had there | Hardware, safety |
 
 ---
 
@@ -119,9 +126,9 @@ replacement, not the original.
 | 1 | Chassis | Car-style chassis with steerable front wheels; source/model unknown | Phase 0/1 |
 | 2 | Wheelbase L and δ_max | Not needed on this branch (no odometry, no path planning); only the physical servo travel limits matter (#32) | — |
 | 3 | Motor specs | RESOLVED by Decided #55 — 5 V DVD-drive stepper, ~500 mA per phase | — |
-| 4 | Battery capacity | mAh of each cell; the pack is 1S2P, so pack capacity ≈ 2× cell mAh at 3.7 V | v1 |
-| 5 | Sensor-head layout | SUPERSEDED by Decided #21 (two sensors facing opposite on one head) | — |
-| 6 | Scan geometry | SUPERSEDED by Decided #21 (opposed sensors, 180° head sweep = 360°) | — |
+| 4 | Battery capacity | mAh of each cell; the pack is 1S2P, so pack capacity ≈ 2× cell mAh at 3.7 V. The BOM names a matched pair without a capacity — the measured value is recorded on the bench sheet (issue #5) | v1 |
+| 5 | Sensor-head layout | SUPERSEDED by Decided #45 — the rotating head is gone, one frontal HC-SR04 only | — |
+| 6 | Scan geometry | SUPERSEDED by Decided #45 and #40 — no scan geometry, only forward coverage | — |
 | 7 | Motor encoder | Not needed on this branch (no odometry, no path planning) | — |
 | 8 | Localization method | Not needed on this branch (no odometry, no path planning) | — |
 | 9 | Obstacle threshold | RENAMED on this branch to #13 (stop threshold) — the E-stop part is withdrawn, the interlock part is kept | Phase 3 |

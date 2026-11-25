@@ -32,18 +32,21 @@ drops publishes — this was a real bug, see `git log a916730`).
 
 ## 2. GPIO map (firmware ↔ hardware doc)
 
+This table tracks the **branch** pin map (`docs/hardware.md` §3, DECIDED #71).
+The rest of this file still describes the `main`-line implementation and is
+rewritten under issue #18.
+
 | Function | GPIO | Code constant | Accuracy |
 | -------- | ---- | ------------- | -------- |
-| Sensor-head servo | 17 | `kHeadServoPin` | matches `hardware.md` §3 |
+| Motor driver `INA` / `INB` | 32 / 33 | — (control surface, issue #7) | matches `hardware.md` §3 |
 | Steering servo | 16 | `kSteerServoPin` (range `[40, 140]`) | matches `hardware.md` §3 |
-| Ultrasonic 1 TRIG | 25 | `kTrig1Pin` | matches |
-| Ultrasonic 1 ECHO | 26 | `kEcho1Pin` | matches (5 V → level-shift!) |
-| Ultrasonic 2 TRIG | 32 | `kTrig2Pin` | matches |
-| Ultrasonic 2 ECHO | 33 | `kEcho2Pin` | matches (5 V → level-shift!) |
-| I2C SDA | 21 | `Ssd1306Display` uses `Wire` | matches (`hardware.md` §4) |
-| I2C SCL | 22 | `Ssd1306Display` uses `Wire` | matches |
-| E-stop button | 4 | — (Phase 1) | matches |
-| L298N ENA/IN1/IN2 | 13/14/27 | — (Phase 1) | matches |
+| Ultrasonic `TRIG` | 25 | `kTrigPin` | matches |
+| Ultrasonic `ECHO` | 26 | `kEchoPin` | matches (5 V → divider!) |
+| E-stop button | 4 | — (issue #13) | matches (DECIDED #76) |
+| Battery divider tap | 35 | — (issue #15) | matches (ADC1_CH7, DECIDED #72) |
+| Sensor-head servo | 17 | — | removed on this branch (DECIDED #45) |
+| Ultrasonic 2 `TRIG` / `ECHO` | 32 / 33 | — | removed; the pins are reused by the motor driver (DECIDED #45, #71) |
+| I2C SDA / SCL | 21 / 22 | — | removed with the OLED (DECIDED #44) |
 
 > Never assign a pin already in use; consult `docs/hardware.md` §3 constraints
 > (flash pins 6–11, strapping pins, input-only 34–39).
